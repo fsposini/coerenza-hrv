@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coerenza HRV — Dr. Sposini</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3f8ba0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Coerenza HRV">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root{
+    --teal:#3f8ba0; --teal-d:#2c6475; --ink:#1f2d33; --muted:#65787f;
+    --line:#dce5e8; --bg:#f4f7f8; --card:#ffffff;
+    --eq:#1b8a5a; --ec:#7cb342; --st:#f4a82c; --sf:#e8682a; --ma:#b3201e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+       color:var(--ink);background:var(--bg);line-height:1.5;font-size:15px}
+  .wrap{max-width:1060px;margin:0 auto;padding:24px}
+  header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;
+       border-bottom:3px solid var(--teal);padding-bottom:14px;margin-bottom:22px}
+  header.top h1{font-size:22px;margin:0;color:var(--teal-d);letter-spacing:.2px}
+  header.top .sub{font-size:13px;color:var(--muted);margin-top:2px}
+  header.top .brand{font-size:12px;color:var(--muted);text-align:right;line-height:1.4}
+  .grid{display:grid;grid-template-columns:340px 1fr;gap:22px;align-items:start}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;
+       box-shadow:0 1px 2px rgba(0,0,0,.03);margin-bottom:22px}
+  .sec-title{font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:#fff;background:var(--teal);
+       display:inline-block;padding:4px 12px;border-radius:6px;margin:6px 0 16px}
+  .card h2{font-size:14px;text-transform:uppercase;letter-spacing:.6px;color:var(--teal-d);
+       margin:0 0 14px;border-bottom:1px solid var(--line);padding-bottom:8px}
+  label.f{display:block;font-size:12px;color:var(--muted);margin:10px 0 3px;font-weight:600}
+  input,select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;
+       font-size:14px;font-family:inherit;background:#fff;color:var(--ink)}
+  input:focus,select:focus{outline:none;border-color:var(--teal)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .hint{font-size:11px;color:var(--muted);margin-top:2px}
+  .btn{margin-top:16px;width:100%;background:var(--teal);color:#fff;border:none;padding:11px;
+       border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
+  .btn:hover{background:var(--teal-d)}
+  .btn.ghost{background:#fff;color:var(--teal-d);border:1px solid var(--teal);margin-top:8px}
+
+  .gaugewrap{text-align:center}
+  .state-big{font-size:30px;font-weight:700;margin:6px 0 0}
+  .finger{font-size:15px;color:var(--muted);margin:2px 0 0}
+  .state-note{font-size:13px;color:var(--muted);margin:8px auto 0;max-width:560px}
+  .legend{display:flex;justify-content:center;gap:14px;margin-top:14px;flex-wrap:wrap;font-size:11px}
+  .legend span{display:inline-flex;align-items:center;gap:5px;color:var(--muted)}
+  .legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+
+  table.bk{width:100%;border-collapse:collapse;margin-top:4px;font-size:13.5px}
+  table.bk th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;
+       color:var(--muted);border-bottom:1px solid var(--line);padding:6px 8px;font-weight:600}
+  table.bk td{padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .val{font-weight:700}
+  .ref{color:var(--muted);font-size:12px}
+  .tag{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11.5px;font-weight:700;color:#fff}
+  .bar{height:7px;border-radius:6px;background:#eef2f3;position:relative;margin-top:5px;overflow:hidden}
+  .bar > i{position:absolute;top:0;bottom:0;left:0;border-radius:6px}
+  .miniref{position:absolute;top:-3px;bottom:-3px;width:2px;background:#9fb4bb}
+
+  .spectro{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:6px}
+  .spectro .b{background:#f7fafb;border:1px solid var(--line);border-radius:9px;padding:10px;text-align:center}
+  .spectro .b b{font-size:20px;display:block;color:var(--teal-d)}
+  .spectro .b small{color:var(--muted);font-size:11px}
+
+  .commentary p{margin:0 0 11px}
+  .commentary .lead{font-size:15px}
+  .flag{background:#fff8e6;border:1px solid #f0d98a;border-radius:9px;padding:12px 14px;
+       font-size:13px;color:#6b5418;margin-top:14px}
+  .flag b{color:#6b5418}
+  .disc{font-size:12px;color:var(--muted);margin-top:18px;border-top:1px dashed var(--line);padding-top:12px}
+  .full{grid-column:1/-1}
+
+  /* fasico / report */
+  .reactive-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .react-badge{font-size:20px;font-weight:700;padding:6px 16px;border-radius:10px;color:#fff}
+  .reserve{flex:1;min-width:220px}
+  .reserve .bar{height:14px}
+  .findings{list-style:none;padding:0;margin:14px 0 0}
+  .findings li{padding:6px 0 6px 26px;position:relative;font-size:13.5px;border-bottom:1px dashed var(--line)}
+  .findings li:before{position:absolute;left:0;top:6px;font-weight:700}
+  .findings li.ok:before{content:"✓";color:var(--eq)}
+  .findings li.no:before{content:"✕";color:var(--ma)}
+  .findings li.warn:before{content:"!";color:var(--st)}
+  .delta{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px}
+
+  .strategy{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:6px}
+  .strategy .dom{background:#f7fafb;border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .strategy .dom h3{margin:0 0 7px;font-size:14px;color:var(--teal-d)}
+  .strategy .dom.prio{background:#eef6ed;border-color:#bcd9b6}
+  .strategy .dom .pflag{font-size:11px;font-weight:700;color:var(--eq);text-transform:uppercase;letter-spacing:.4px}
+  .progn{background:#eef4f6;border-left:4px solid var(--teal);padding:12px 16px;border-radius:6px;margin:6px 0 16px;font-size:14px}
+
+  @media(max-width:880px){.grid{grid-template-columns:1fr}.strategy{grid-template-columns:1fr}}
+  @media print{
+    body{background:#fff;font-size:12.5px}
+    .noprint{display:none!important}
+    .card{box-shadow:none;break-inside:avoid;border-color:#ccc}
+    .wrap{padding:0}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>HRV Test Dr. Sposini Federico</h1>
+      <div class="sub">Test tonico 5 min + test fasico 1 min · classificazione MANO · scale normative VOSS 2015 (SDNN/RMSSD) e Self Coherence (Total Power)</div>
+    </div>
+    <div class="brand">Dr. Federico Sposini<br>Medicina Funzionale e Longevity</div>
+  </header>
+
+  <!-- DATI PAZIENTE -->
+  <div class="card noprint">
+    <h2>Paziente</h2>
+    <div class="row3">
+      <div><label class="f">Nome</label><input id="name" type="text" value="Federico Sposini"></div>
+      <div><label class="f">Sesso</label><select id="sex"><option value="male">Maschio</option><option value="female">Femmina</option></select></div>
+      <div><label class="f">Età</label><input id="age" type="number" value="51"></div>
+    </div>
+    <label class="f">Data / note</label><input id="date" type="text" value="10 giugno 2026">
+  </div>
+
+  <div class="grid">
+    <!-- INPUT TONICO -->
+    <div class="card noprint" style="margin-bottom:0">
+      <span class="sec-title">1 · Test tonico (5 min)</span>
+      <label class="f">Popolazione di riferimento (per il Total Power)</label>
+      <select id="pop"><option value="comune">Comune</option><option value="atleti">Atleti</option><option value="fumatori">Fumatori</option></select>
+      <div class="row2">
+        <div><label class="f">SDNN (ms)</label><input id="sdnn" type="number" step="0.1" value="47.8"></div>
+        <div><label class="f">RMSSD (ms)</label><input id="rmssd" type="number" step="0.1" value="31.9"></div>
+      </div>
+      <label class="f">Total Power (ms²)</label><input id="tp" type="number" step="0.1" value="460.7">
+      <div class="row3">
+        <div><label class="f">VLF</label><input id="vlf" type="number" step="0.1" value="195.5"></div>
+        <div><label class="f">LF</label><input id="lf" type="number" step="0.1" value="128.3"></div>
+        <div><label class="f">HF</label><input id="hf" type="number" step="0.1" value="60.7"></div>
+      </div>
+      <div class="hint">VLF/LF/HF in potenza assoluta (ms²/Hz), come da referto EnWave.</div>
+      <div class="row3">
+        <div><label class="f">LF/HF</label><input id="lfhf" type="number" step="0.1" value="2.1"></div>
+        <div><label class="f">Coherence %</label><input id="coh" type="number" step="0.1" value="34.2"></div>
+        <div><label class="f">FC media (bpm)</label><input id="hr" type="number" step="0.1" value="54.5"></div>
+      </div>
+    </div>
+
+    <!-- RESULT TONICO -->
+    <div class="card gaugewrap" id="resultCard" style="margin-bottom:0">
+      <h2>Quadro autonomico (tonico)</h2>
+      <svg id="gauge" viewBox="0 0 400 235" width="100%" style="max-width:440px"></svg>
+      <div class="state-big" id="stateBig">—</div>
+      <div class="finger" id="fingerLbl"></div>
+      <div class="state-note" id="stateNote"></div>
+      <div class="legend">
+        <span><i style="background:var(--eq)"></i>Equilibrato · Pollice</span>
+        <span><i style="background:var(--ec)"></i>Eccitato · Indice</span>
+        <span><i style="background:var(--st)"></i>Stressato · Medio</span>
+        <span><i style="background:var(--sf)"></i>Sfinito · Anulare</span>
+        <span><i style="background:var(--ma)"></i>Malato · Mignolo</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- BREAKDOWN TONICO -->
+  <div class="card" style="margin-top:22px">
+    <h2>Lettura tonico, parametro per parametro</h2>
+    <table class="bk">
+      <thead><tr><th>Parametro</th><th>Valore</th><th>Riferimento (età/sesso)</th><th style="width:150px">Livello</th><th style="width:160px">Posizione</th></tr></thead>
+      <tbody id="bkBody"></tbody>
+    </table>
+    <h2 style="margin-top:22px">Distribuzione spettrale (% sul Total Power)</h2>
+    <div class="spectro" id="spectro"></div>
+    <div class="hint" id="spectroNote" style="margin-top:8px"></div>
+    <div class="flag" id="vlfFlag" style="display:none;margin-top:12px"></div>
+    <div class="flag" id="tonicInversionFlag" style="display:none;margin-top:12px"></div>
+  </div>
+
+  <!-- INPUT FASICO -->
+  <div class="card noprint">
+    <span class="sec-title">2 · Test fasico — deep breathing (1 min, 6/min)</span>
+    <div class="row3">
+      <div><label class="f">FC media (bpm)</label><input id="hrF" type="number" step="0.1" value="56.3"></div>
+      <div><label class="f">SDNN (ms)</label><input id="sdnnF" type="number" step="0.1" value="34.6"></div>
+      <div><label class="f">RMSSD (ms)</label><input id="rmssdF" type="number" step="0.1" value="46.6"></div>
+    </div>
+    <div class="row3">
+      <div><label class="f">MHRR (bpm)</label><input id="mhrr" type="number" step="0.1" value="5.0"></div>
+      <div><label class="f">MHRR rif. min</label><input id="mhrrMin" type="number" step="0.1" value="6.7"></div>
+      <div><label class="f">Coherence %</label><input id="cohF" type="number" step="0.1" value="38.0"></div>
+    </div>
+    <div class="hint">MHRR = Mean Heart Rate Range (ampiezza dell'oscillazione). Il "rif. min" è la soglia inferiore stampata sul referto EnWave per l'età.</div>
+    <button class="btn" onclick="calc()">Genera report finale</button>
+    <button class="btn ghost" onclick="window.print()">Stampa / Salva PDF</button>
+  </div>
+
+  <!-- ANALISI FASICA -->
+  <div class="card" id="fasicCard">
+    <h2>Risposta al test fasico (riserva adattativa)</h2>
+    <div class="reactive-head">
+      <div class="react-badge" id="reactBadge">—</div>
+      <div class="reserve">
+        <div class="hint" style="margin-bottom:3px">Riserva adattativa stimata</div>
+        <div class="bar"><i id="reserveBar"></i></div>
+      </div>
+    </div>
+    <ul class="findings" id="findings"></ul>
+  </div>
+
+  <!-- REPORT FINALE -->
+  <div class="card commentary">
+    <h2>Report finale integrato</h2>
+    <div id="finalHead"></div>
+    <div class="progn" id="prognosi"></div>
+    <h2 style="margin-top:18px">Strategia di intervento (metodo Self Coherence)</h2>
+    <div class="strategy" id="strategy"></div>
+
+    <div class="flag">
+      <b>Note metodologiche.</b>
+      <span id="flags"></span>
+    </div>
+    <div class="disc">
+      <b>Nota interpretativa.</b> La classificazione MANO (Pollice→Mignolo) e la stima della riserva adattativa sono
+      <b>ipotetiche</b>: individuano lo stato e la reattività che meglio correlano col pattern dei dati secondo il
+      Modello Integrato Self Coherence. Tonico calibrato su scala VOSS (SDNN/RMSSD) e scala Self Coherence per popolazione (Total Power),
+      registrazioni 5 min; fasico letto come risposta alla perturbazione respiratoria standardizzata (Harmat).
+      Strumento di supporto al ragionamento clinico, non referto diagnostico.
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ---------- VOSS 2015 (Min–Med–Max, ms) ---------- */
+const VOSS = {
+  male: [
+    {a:[25,34], rmssd:[19.8,39.7,59.6], sdnn:[29.1,50.0,70.9]},
+    {a:[35,44], rmssd:[15.5,32.0,48.5], sdnn:[27.8,44.6,61.4]},
+    {a:[45,54], rmssd:[12.1,23.0,33.9], sdnn:[22.2,36.8,51.4]},
+    {a:[55,64], rmssd:[8.8,19.9,31.0],  sdnn:[18.1,32.8,47.5]},
+    {a:[65,74], rmssd:[8.4,19.1,29.8],  sdnn:[16.4,29.6,42.8]},
+  ],
+  female: [
+    {a:[25,34], rmssd:[20.1,42.9,65.7], sdnn:[29.7,48.7,67.7]},
+    {a:[35,44], rmssd:[16.9,35.4,53.9], sdnn:[24.9,45.4,65.9]},
+    {a:[45,54], rmssd:[12.7,26.3,39.9], sdnn:[23.1,36.9,50.7]},
+    {a:[55,64], rmssd:[9.5,21.4,33.3],  sdnn:[18.2,30.6,43.0]},
+    {a:[65,74], rmssd:[7.3,19.1,30.9],  sdnn:[16.0,27.8,39.6]},
+  ]
+};
+/* ---------- Total Power: scala ufficiale Self Coherence (ms²), range [min,max] per età e popolazione ----------
+   Popolazione 20-90 anni, registrazioni di breve periodo. Comune / Atleti / Fumatori. */
+const TP_SC = {
+  comune:   [{a:[20,29],r:[2500,3000]},{a:[30,39],r:[1500,2000]},{a:[40,49],r:[1000,1500]},{a:[50,59],r:[800,1300]},{a:[60,69],r:[600,1100]},{a:[70,79],r:[400,900]},{a:[80,89],r:[200,700]}],
+  atleti:   [{a:[20,29],r:[2900,3400]},{a:[30,39],r:[2200,2700]},{a:[40,49],r:[1500,2000]},{a:[50,59],r:[1300,1800]},{a:[60,69],r:[1100,1600]},{a:[70,79],r:[900,1400]},{a:[80,89],r:[700,1200]}],
+  fumatori: [{a:[20,29],r:[1100,1600]},{a:[30,39],r:[800,1300]},{a:[40,49],r:[500,1000]},{a:[50,59],r:[300,800]},{a:[60,69],r:[100,600]},{a:[70,79],r:[100,400]},{a:[80,89],r:[100,200]}]
+};
+const POP_LABEL={comune:'Comune',atleti:'Atleti',fumatori:'Fumatori'};
+function tpBandFor(pop,age){const t=TP_SC[pop]||TP_SC.comune;if(age<t[0].a[0])return t[0];for(const b of t){if(age>=b.a[0]&&age<=b.a[1])return b;}return t[t.length-1];}
+
+const STATES = [
+  {finger:'Pollice', label:'Equilibrato', color:'#1b8a5a'},
+  {finger:'Indice',  label:'Eccitato',    color:'#7cb342'},
+  {finger:'Medio',   label:'Stressato',   color:'#f4a82c'},
+  {finger:'Anulare', label:'Sfinito',     color:'#e8682a'},
+  {finger:'Mignolo', label:'Malato',      color:'#b3201e'},
+];
+const PROTO = [ [10,60,30],[50,40,10],[60,30,10],[30,10,60] ];
+
+function vossBand(sex,age){const t=VOSS[sex]||VOSS.male;if(age<t[0].a[0])return t[0];for(const b of t){if(age>=b.a[0]&&age<=b.a[1])return b;}return t[t.length-1];}
+function sevFromVoss(v,[mn,md,mx]){
+  if(v>=mx) return 0;
+  if(v>=md) return 1*(mx-v)/(mx-md);
+  if(v>=mn) return 1 + 2*(md-v)/(md-mn);
+  return Math.min(4, 3 + (mn-v)/Math.max(mn,1));
+}
+/* severità 0..4 per indici "alto=sano" dato un range normale [min,max] (Total Power) */
+function sevFromRange(v,mn,mx){
+  const mid=(mn+mx)/2;
+  if(v>=mx) return 0;                              // sopra il range → Alto
+  if(v>=mid) return (mx-v)/(mx-mid);               // 0..1  alto-normale
+  if(v>=mn) return 1+(mid-v)/(mid-mn);             // 1..2  basso-normale
+  return Math.min(4, 2+2*(mn-v)/Math.max(mn,1));   // 2..4  sotto il range
+}
+function levelLabel(sev){if(sev<0.5)return'Alto';if(sev<1.5)return'Medio-Alto';if(sev<2.5)return'Medio-Basso';if(sev<3.5)return'Basso';return'Basso / Disregolato';}
+function sevCoh(c){
+  const k=[[60,0],[50,0.5],[30,1.5],[20,2.5],[10,3.5],[0,4]];
+  if(c>=k[0][0])return 0;
+  for(let i=0;i<k.length-1;i++){const[x1,y1]=k[i],[x2,y2]=k[i+1];if(c<=x1&&c>=x2)return y1+(x1-c)/(x1-x2)*(y2-y1);}
+  return 4;
+}
+function cohLabel(c){if(c>=50)return'> 50% (equilibrio)';if(c>=30)return'30–50% (eccitato)';if(c>=20)return'20–30% (stressato)';return'< 20% (sfinito)';}
+function sevSpectro(vlf,lf,hf,tp){
+  const sum=vlf+lf+hf;
+  const disp = tp>0 ? [vlf/tp*100,lf/tp*100,hf/tp*100] : [0,0,0];
+  const shape= sum>0 ? [vlf/sum*100,lf/sum*100,hf/sum*100] : [0,0,0];
+  let num=0,den=0,best=0,bestd=1e9;
+  PROTO.forEach((pr,i)=>{const d=Math.abs(shape[0]-pr[0])+Math.abs(shape[1]-pr[1])+Math.abs(shape[2]-pr[2]);const w=Math.exp(-d/18);num+=i*w;den+=w;if(d<bestd){bestd=d;best=i;}});
+  return {sev:num/den, disp, shape, near:best};
+}
+function tag(idx){const s=STATES[idx];return `<span class="tag" style="background:${s.color}">${s.label}</span>`;}
+function nearestState(sev){return Math.max(0,Math.min(4,Math.round(sev)));}
+function num(id){return +document.getElementById(id).value;}
+function txt(id){return document.getElementById(id).value;}
+
+/* ---------- GAUGE ---------- */
+function polar(cx,cy,r,deg){const a=deg*Math.PI/180;return [cx+r*Math.cos(a),cy-r*Math.sin(a)];}
+function drawGauge(sev){
+  const cx=200,cy=200,r=150,tw=30;
+  const zones=[[0,0.5,'#1b8a5a'],[0.5,1.5,'#7cb342'],[1.5,2.5,'#f4a82c'],[2.5,3.5,'#e8682a'],[3.5,4,'#b3201e']];
+  const ang=s=>180-(s/4)*180; let svg='';
+  zones.forEach(z=>{const[x1,y1]=polar(cx,cy,r,ang(z[0]));const[x2,y2]=polar(cx,cy,r,ang(z[1]));
+    svg+=`<path d="M${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 0 1 ${x2.toFixed(1)},${y2.toFixed(1)}" fill="none" stroke="${z[2]}" stroke-width="${tw}"/>`;});
+  for(let i=0;i<5;i++){const[tx,ty]=polar(cx,cy,r-tw-10,ang(i));svg+=`<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" font-size="11" fill="#65787f" text-anchor="middle">${i+1}</text>`;}
+  const sc=Math.max(0,Math.min(4,sev));const[nx,ny]=polar(cx,cy,r-tw+6,ang(sc));
+  svg+=`<line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="#1f2d33" stroke-width="4" stroke-linecap="round"/>`;
+  svg+=`<circle cx="${cx}" cy="${cy}" r="9" fill="#1f2d33"/>`;
+  svg+=`<text x="${cx}" y="${cy+34}" text-anchor="middle" font-size="13" fill="#65787f">indice di severità ${Math.round(sc/4*100)}%</text>`;
+  document.getElementById('gauge').innerHTML=svg;
+}
+function barVoss(v,[mn,md,mx]){
+  const lo=mn*0.6, hi=mx*1.15, span=hi-lo;
+  const pos=Math.max(0,Math.min(100,(v-lo)/span*100));
+  const pMd=(md-lo)/span*100,pMx=(mx-lo)/span*100,pMn=(mn-lo)/span*100;
+  const col=v>=mx?'#1b8a5a':v>=md?'#7cb342':v>=mn?'#f4a82c':'#b3201e';
+  return `<div class="bar"><i style="width:${pos}%;background:${col}"></i><span class="miniref" style="left:${pMn}%"></span><span class="miniref" style="left:${pMd}%"></span><span class="miniref" style="left:${pMx}%"></span></div>`;
+}
+
+/* ---------- ANALISI FASICA (confronto col tonico) ---------- */
+function analyzeFasic(t,f){
+  const dS=f.sdnn-t.sdnn, dSp=t.sdnn?dS/t.sdnn*100:0;
+  const dR=f.rmssd-t.rmssd, dRp=t.rmssd?dR/t.rmssd*100:0;
+  const dC=f.coh-t.coh, dH=f.hr-t.hr;
+  const inversion=f.rmssd>f.sdnn;
+  const mhrrLow=f.mhrr>0 && f.mhrrMin>0 && f.mhrr<f.mhrrMin;
+  const c={
+    sdnnUp:dSp>=5, rmssdUp:dRp>=5, rmssdWorse:dRp<=-10,
+    hrStable:Math.abs(dH)<=6, cohFull:f.coh>=80, cohOk:f.coh>=50,
+    cohRise:dC>=10, mhrrOk:!mhrrLow, hyper:dSp>=180
+  };
+  // riserva 0-100
+  let res=0;
+  res+=c.hrStable?15:0; res+=c.sdnnUp?20:0; res+=c.rmssdUp?15:0;
+  res+=c.cohFull?30:(c.cohOk?18:0); res+=c.mhrrOk?20:0;
+  if(c.rmssdWorse) res-=25; res=Math.max(0,Math.min(100,res));
+  // classificazione
+  let cls,color;
+  if(c.hyper && f.rmssd>f.sdnn*0.9){cls='Iperreattiva';color='#e8682a';}
+  else if(c.rmssdWorse || (f.coh<25 && mhrrLow && !c.sdnnUp && dRp<10)){cls='Disregolata';color='#b3201e';}
+  else if(c.sdnnUp && c.cohFull && c.mhrrOk && c.hrStable){cls='Funzionale';color='#1b8a5a';}
+  else {cls='Iporeattiva';color='#f4a82c';}
+  // findings
+  const fnd=[];
+  fnd.push({k:c.hrStable?'ok':'warn', t:`Frequenza cardiaca ${c.hrStable?'stabile':'in variazione'} <span class="delta">(${dH>=0?'+':''}${dH.toFixed(1)} bpm)</span>${c.hrStable?' — nessuno sforzo diaframmatico':' — possibile sforzo/disfunzione diaframmatica'}`});
+  fnd.push({k:c.sdnnUp?'ok':'no', t:`SDNN ${c.sdnnUp?'in espansione':'non si espande'} <span class="delta">(${dSp>=0?'+':''}${dSp.toFixed(0)}%)</span> — atteso in aumento col respiro profondo`});
+  fnd.push({k:c.rmssdWorse?'no':(c.rmssdUp?'ok':'warn'), t:`RMSSD ${c.rmssdWorse?'peggiora':(c.rmssdUp?'in aumento (vago reattivo)':'stabile')} <span class="delta">(${dRp>=0?'+':''}${dRp.toFixed(0)}%)</span>`});
+  fnd.push({k:c.cohFull?'ok':(c.cohOk?'warn':'no'), t:`Coherence ${f.coh.toFixed(0)}% <span class="delta">(${dC>=0?'+':''}${dC.toFixed(1)} pt)</span> — obiettivo ≥80% ${c.cohFull?'raggiunto':'non raggiunto'}`});
+  fnd.push({k:c.mhrrOk?'ok':'no', t:`MHRR ${f.mhrr.toFixed(1)} bpm — ampiezza dell'oscillazione ${c.mhrrOk?'adeguata':'smorzata (sotto soglia '+f.mhrrMin+')'}`});
+  if(inversion) fnd.push({k:'warn', t:`Inversione RMSSD &gt; SDNN — possibile capacità adattativa sotto pressione`});
+  return {cls,color,res,fnd,c,dSp,dRp,dC,dH,inversion};
+}
+
+/* ---------- STRATEGIE per stato MANO (da Lez.8 + respiro) ---------- */
+function strategyFor(idx, coherenceWeak){
+  const D = {
+    0:{ // Equilibrato
+      respiro:"Mantenimento: respirazione di risonanza per consolidare la coerenza; può diventare strumento di performance.",
+      movimento:"Spazio agli stimoli ormetici: attività intensa e piacevole, anche anaerobica; esposizione al freddo.",
+      sonno:"7–9h di qualità; il recupero notturno sostiene gli stimoli ormetici diurni.",
+      alimentazione:"Alimentazione pulita; digiuno intermittente ben tollerato in zona verde.",
+      mente:"Coerenza psicofisiologica come pratica di mantenimento; gestione attiva delle emozioni."
+    },
+    1:{ // Eccitato
+      respiro:"Allenamento della risonanza con biofeedback EnWave: 5 min × 2–3/die, tutti i giorni. Trova la frequenza risonante (~5,5–6/min), respirazione diaframmatica con espiro più lungo. Priorità alla sessione serale. Obiettivo misurabile: far salire la coherence verso ≥80%.",
+      movimento:"Recupero subito dopo ogni attivazione (defaticamento + movimento leggero per smaltire il picco glicemico). Area rigenerativa 60–70% FCmax, 20–30 min. Anaerobico intenso entro il pomeriggio, mai la sera.",
+      sonno:"Aumentare REM e NREM; 7–9h; orari costanti; niente alcol serale (taglia il REM tardivo).",
+      alimentazione:"Più micronutrienti, meno carboidrati semplici/farina 00. Cena anticipata e leggera sui carboidrati (la glicemia serale tiene alta la FC e basso l'RMSSD fino a notte fonda). Digiuno notturno dolce >10–12h utile; evitare stressor ormetici aggressivi.",
+      mente:"Processazione diurna delle emozioni. Respirazione di risonanza abbinata a un'emozione 'con un perché' (coerenza psicofisiologica): l'obiettivo è l'equilibrio, non solo il parasimpatico."
+    },
+    2:{ // Stressato
+      respiro:"Respirazione di risonanza quotidiana, priorità assoluta; più sessioni brevi. Obiettivo: ricostruire la coerenza prima di chiedere performance al sistema.",
+      movimento:"Il recupero diventa parte preponderante e attiva della giornata. Attività piacevole, calibrata su preferenze e morfotipo — il piacere è terapeutico. Niente stimoli ormetici aggressivi.",
+      sonno:"Protezione del sonno come pilastro; ritmi regolari; ridurre i carichi mentali serali.",
+      alimentazione:"Ridurre carboidrati semplici; sostenere micronutrienti; attenzione al microbiota (infiammazione intestinale → disregolazione emotiva).",
+      mente:"Processazione diurna dei contenuti emotivi, centrale in questa fase. Lavoro sul carico allostatico."
+    },
+    3:{ // Sfinito
+      respiro:"Respirazione dolce e sostenuta — non impegnativa, senza iperventilazione. Il respiro aiuta, ma non è la leva principale in questa fase: la priorità è restituire tono ortosimpatico (vitalità), non stimolare ulteriormente il vago già ipertonico.",
+      movimento:"Il grande assente è l'ortosimpatico, non il vago. Obiettivo: circadianizzare. Microattività mattutine di sostegno (freddo moderato, piccola quota di carboidrati, caffeina nei limiti tollerabili) per riattivare progressivamente il sistema simpatico. Non coccolare il para — dare vitalità al sistema.",
+      sonno:"Priorità assoluta: ripristinare il ritmo sonno-veglia.",
+      alimentazione:"NIENTE digiuno (Total Power basso = controindicato). Sostegno energetico regolare; evitare ulteriori stressor.",
+      mente:"Ridurre i carichi; coccolare più che stimolare; valutare supporto psicologico."
+    },
+    4:{ // Malato
+      respiro:"Respirazione di sostegno, dolce. Il respiro resta utile ma è secondario all'inquadramento clinico.",
+      movimento:"Gestione caso per caso secondo la patologia. Evitare carichi finché il quadro non è inquadrato.",
+      sonno:"Ordine circadiano prioritario nelle disregolazioni autonomiche.",
+      alimentazione:"Se base infiammatoria: normalizzare l'infiammazione. Nessuno stressor metabolico.",
+      mente:"Necessario inquadramento clinico approfondito; lo strumento qui è di supporto, non sostituisce la valutazione medica."
+    }
+  };
+  const s=D[idx];
+  const out=[
+    {h:'🫁 Respirazione', t:s.respiro, prio:coherenceWeak},
+    {h:'🏃 Attività cardiaca e fisica', t:s.movimento},
+    {h:'😴 Sonno', t:s.sonno},
+    {h:'🍽️ Alimentazione', t:s.alimentazione},
+    {h:'🧠 Sfera mentale', t:s.mente},
+  ];
+  return out;
+}
+
+/* ---------- CALCOLO ---------- */
+function calc(){
+  const sex=txt('sex'), age=num('age')||50, nm=txt('name'), dt=txt('date');
+  const sdnn=num('sdnn'),rmssd=num('rmssd'),tp=num('tp'),vlf=num('vlf'),lf=num('lf'),hf=num('hf'),lfhf=num('lfhf'),coh=num('coh'),hr=num('hr');
+
+  // --- tonico ---
+  const pop=txt('pop');
+  const band=vossBand(sex,age), tpB=tpBandFor(pop,age);
+  const sSdnn=sevFromVoss(sdnn,band.sdnn), sRmssd=sevFromVoss(rmssd,band.rmssd), sTP=sevFromRange(tp,tpB.r[0],tpB.r[1]);
+  const sCoh=sevCoh(coh), sp=sevSpectro(vlf,lf,hf,tp);
+  const sevTot=(sSdnn+sRmssd+sTP+sp.sev+sCoh)/5;
+  const idx=nearestState(sevTot), st=STATES[idx];
+  drawGauge(sevTot);
+  document.getElementById('stateBig').textContent=st.label;
+  document.getElementById('stateBig').style.color=st.color;
+  document.getElementById('fingerLbl').textContent='Mappa MANO: '+st.finger;
+  const frac=sevTot-idx; let note;
+  if(idx<4&&frac>0.30) note=`Al confine con «${STATES[idx+1].label}» (${STATES[idx+1].finger}).`;
+  else if(idx>0&&frac<-0.30) note=`Al confine con «${STATES[idx-1].label}» (${STATES[idx-1].finger}).`;
+  else note='Pattern coerente e centrato sullo stato indicato.';
+  document.getElementById('stateNote').textContent=note;
+
+  const rows=[
+    {n:'SDNN',v:sdnn+' ms',ref:`${band.sdnn[0]} – <b>${band.sdnn[1]}</b> – ${band.sdnn[2]} ms <span class="ref">· VOSS</span>`,sev:sSdnn,lvl:levelLabel(sSdnn),bar:barVoss(sdnn,band.sdnn)},
+    {n:'RMSSD',v:rmssd+' ms',ref:`${band.rmssd[0]} – <b>${band.rmssd[1]}</b> – ${band.rmssd[2]} ms <span class="ref">· VOSS</span>`,sev:sRmssd,lvl:levelLabel(sRmssd),bar:barVoss(rmssd,band.rmssd)},
+    {n:'Total Power',v:tp+' ms²',ref:`${tpB.r[0]} – ${tpB.r[1]} ms² <span class="ref">· Self Coherence · pop. ${POP_LABEL[pop]}</span>`,sev:sTP,lvl:levelLabel(sTP),bar:barVoss(tp,[tpB.r[0],(tpB.r[0]+tpB.r[1])/2,tpB.r[1]])},
+    {n:'Distribuzione VLF/LF/HF',v:sp.shape.map(x=>Math.round(x)+'%').join(' / '),ref:`forma (norm. 100%); prototipo: ${STATES[sp.near].label} (${PROTO[sp.near].join('-')})`,sev:sp.sev,lvl:STATES[nearestState(sp.sev)].label,bar:''},
+    {n:'Coherence',v:coh+' %',ref:'>50 eq · &lt;50 ecc · &lt;30 str · &lt;20 sfin',sev:sCoh,lvl:cohLabel(coh),bar:''},
+  ];
+  document.getElementById('bkBody').innerHTML=rows.map(r=>`<tr><td><b>${r.n}</b></td><td class="val">${r.v}</td><td class="ref">${r.ref}</td><td>${tag(nearestState(r.sev))} <span class="ref">${r.lvl}</span></td><td>${r.bar}</td></tr>`).join('');
+  const labels=['VLF','LF','HF'];
+  document.getElementById('spectro').innerHTML=sp.disp.map((p,i)=>`<div class="b"><b>${Math.round(p)}%</b><small>${labels[i]} <span style="color:#9fb4bb">(su TP)</span></small></div>`).join('');
+  document.getElementById('spectroNote').innerHTML=`Percentuali sul Total Power (somma ${Math.round(sp.disp.reduce((a,b)=>a+b,0))}%, EnWave filtra parte dello spettro). Forma normalizzata a 100% (${sp.shape.map(x=>Math.round(x)+'%').join('/')}) confrontata col prototipo «${STATES[sp.near].label}». LF/HF ${lfhf} → ${lfhf>=2?'predominanza ortosimpatica':lfhf>=1?'bilanciamento orto/para':'predominanza parasimpatica'}.`;
+
+  // --- flag VLF >60% (infiammazione sistemica) ---
+  const vlfPct = tp > 0 ? vlf/tp*100 : 0;
+  const vlfFlagEl = document.getElementById('vlfFlag');
+  if (vlfPct >= 60) {
+    vlfFlagEl.style.display = '';
+    vlfFlagEl.innerHTML = `<b>VLF ≥ 60% del Total Power (${Math.round(vlfPct)}%).</b> Una quota VLF così elevata non è solo un indice di maggiore attivazione ortosimpatica: secondo il modello Master HRV SC è un indicatore di <b>infiammazione sistemica di basso grado</b> o di sforzo fisico in fase di recupero adattativo. Valutare il quadro infiammatorio (CRP, microbiota, carico allostatico).`;
+  } else {
+    vlfFlagEl.style.display = 'none';
+  }
+
+  // --- flag inversione RMSSD > SDNN nel tonico ---
+  const tonicInvFlagEl = document.getElementById('tonicInversionFlag');
+  if (rmssd > sdnn) {
+    tonicInvFlagEl.style.display = '';
+    tonicInvFlagEl.innerHTML = `<b>Inversione RMSSD &gt; SDNN nel test tonico.</b> Fisiologicamente l'SDNN dovrebbe essere superiore all'RMSSD. L'inversione a riposo — in assenza di terapia farmacologica — indica <b>ridotta capacità di adattamento autonomico</b> con riserve contratte. Pesare questo dato nel giudizio clinico complessivo.`;
+  } else {
+    tonicInvFlagEl.style.display = 'none';
+  }
+
+  // --- fasico ---
+  const sdnnF=num('sdnnF'),rmssdF=num('rmssdF'),cohF=num('cohF'),hrF=num('hrF'),mhrr=num('mhrr'),mhrrMin=num('mhrrMin');
+  const hasFasic = sdnnF>0 && rmssdF>0;
+  const fc=document.getElementById('fasicCard');
+  let fa=null;
+  if(hasFasic){
+    fc.style.display='';
+    fa=analyzeFasic({hr,sdnn,rmssd,coh},{hr:hrF,sdnn:sdnnF,rmssd:rmssdF,coh:cohF,mhrr,mhrrMin});
+    const rb=document.getElementById('reactBadge'); rb.textContent=fa.cls+' · riserva '+fa.res+'%'; rb.style.background=fa.color;
+    const bar=document.getElementById('reserveBar'); bar.style.width=fa.res+'%';
+    bar.style.background=fa.res>=66?'#1b8a5a':fa.res>=40?'#f4a82c':'#b3201e';
+    document.getElementById('findings').innerHTML=fa.fnd.map(x=>`<li class="${x.k}">${x.t}</li>`).join('');
+  } else { fc.style.display='none'; }
+
+  // --- report finale ---
+  const coherenceWeak = !hasFasic ? (coh<80) : (fa.cls!=='Funzionale' || cohF<80);
+  let headHtml=`<p class="lead">Quadro tonico: <b style="color:${st.color}">${st.label}</b> (mappa MANO: <b>${st.finger}</b>)`;
+  if(hasFasic) headHtml+=`, con risposta fasica <b style="color:${fa.color}">${fa.cls.toLowerCase()}</b> e riserva adattativa stimata al <b>${fa.res}%</b>`;
+  headHtml+=`.</p>`;
+  document.getElementById('finalHead').innerHTML=headHtml;
+
+  // prognosi
+  let prog;
+  if(!hasFasic){
+    prog = idx===3
+      ? 'Quadro tonico di Sfinimento: Total Power e variabilità globale contratti. Il grande assente è l\'ortosimpatico (la vitalità), non il vago — l\'intervento punta a restituire tono al sistema, non a potenziare il parasimpatico già ipertonico. Inserisci il test fasico per stimare la riserva adattativa disponibile.'
+      : 'Inserisci anche il test fasico per stimare la riserva adattativa e i tempi di recupero.';
+  }
+  else if(fa.cls==='Funzionale'){ prog='Buona riserva adattativa: il sistema risponde bene alla perturbazione. Anche con un tonico non brillante, le risorse ci sono e il recupero è presumibilmente breve.'; }
+  else if(fa.cls==='Iporeattiva'){ prog='Riserva adattativa ridotta: il sistema reagisce solo parzialmente. La coerenza/risonanza è l\'anello debole — è il bersaglio prioritario e misurabile del percorso. Risorse di base presenti, recupero da costruire con costanza.'; }
+  else if(fa.cls==='Disregolata'){
+    prog = 'Riserva adattativa esaurita: il sistema non si sblocca sotto stimolo. Recupero presumibilmente lungo, con interventi su più aree (stile di vita, sonno, sfera psicologica ed eventualmente medica).';
+    if(idx===3) prog += ' In stato Sfinito ricordare che il grande assente è l\'ortosimpatico (la vitalità): la direzione è restituire tono al sistema, non stimolare ulteriormente il vago.';
+  }
+  else { prog='Iperreattività vagale: aumento molto marcato della variabilità sotto stimolo. In ambito sportivo va considerato il sospetto di vago ipertonico / overtraining; contestualizzare con carico allenante e storia clinica.'; }
+  document.getElementById('prognosi').innerHTML=prog;
+
+  // strategia
+  const strat=strategyFor(idx, coherenceWeak);
+  document.getElementById('strategy').innerHTML=strat.map(d=>`<div class="dom${d.prio?' prio':''}"><h3>${d.h}</h3>${d.prio?'<div class="pflag">Leva prioritaria (il fasico indica la coerenza come anello debole)</div>':''}<div>${d.t}</div></div>`).join('');
+
+  // flags
+  document.getElementById('flags').innerHTML=` Tonico: % VLF/LF/HF sul Total Power (somma &lt;100% per il filtraggio EnWave), forma normalizzata per il match; i 5 parametri pesano allo stesso modo. `+
+    `Fasico: lettura sul dominio del tempo + coerenza + MHRR (le frequenze VLF/LF/HF non sono attendibili su 1 minuto). Risposta sana attesa: SDNN↑ (più dell'RMSSD), FC stabile, coherence verso ≥80%, MHRR ampio.`;
+}
+calc();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js');
+}
+</script>
+</body>
+</html>
