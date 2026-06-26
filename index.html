@@ -123,6 +123,18 @@
     <div class="brand">Dr. Federico Sposini<br>Medicina Funzionale e Longevity</div>
   </header>
 
+  <!-- IMPORT EMWAVE -->
+  <div class="card noprint" id="importCard">
+    <h2>Importa export emWave Pro Plus (opzionale)</h2>
+    <label class="f">File CSV esportato da emWave</label>
+    <input id="csvFile" type="file" accept=".csv,text/csv">
+    <div class="row2" id="sessionPick" style="display:none;margin-top:6px">
+      <div><label class="f">Sessione tonica (HRV 5 min)</label><select id="tonicSel"></select></div>
+      <div><label class="f">Sessione fasica (Deep Breathing)</label><select id="fasicSel"></select></div>
+    </div>
+    <div class="hint" id="importMsg" style="margin-top:8px">Carica il file per popolare i campi e calcolare Poincaré e Stress Index dai <b>battiti reali</b> (SD1/SD2 e istogramma effettivi + DFA α1). Elaborazione 100% locale nel browser: <b>nessun dato esce dal dispositivo</b>.</div>
+  </div>
+
   <!-- DATI PAZIENTE -->
   <div class="card noprint">
     <h2>Paziente</h2>
@@ -542,6 +554,174 @@ function drawSIHist(meanRRms, sdnn, si){
   el.innerHTML=s;
 }
 
+/* ---------- IMPORT EMWAVE: parsing + metriche ESATTE dai RR grezzi ---------- */
+let RAW = null;        // sessioni parsate dal CSV
+let TONIC_RR = null;   // serie RR (NN, ms) della sessione tonica selezionata
+
+function _mean(a){return a.reduce((s,x)=>s+x,0)/a.length;}
+function _std(a,ddof){const m=_mean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)*(x-m),0)/(a.length-(ddof||0)));}
+function _slope(x,y){const mx=_mean(x),my=_mean(y);let n=0,d=0;for(let i=0;i<x.length;i++){n+=(x[i]-mx)*(y[i]-my);d+=(x[i]-mx)*(x[i]-mx);}return n/d;}
+
+function parseEmwaveCSV(text){
+  const rows = text.split(/\r?\n/).map(l=>l.split(','));
+  const hdr = rows.findIndex(r=>r.indexOf('LiveIBI')>=0);
+  if(hdr<0) return null;
+  const valCols=[]; rows[hdr].forEach((v,j)=>{if(v==='LiveIBI')valCols.push(j);});
+  const meta={}; for(let i=0;i<hdr;i++){if(rows[i]&&rows[i][0])meta[rows[i][0]]=i;}
+  const get=(label,c)=>{const i=meta[label];return (i!=null && rows[i][c]!=null)?rows[i][c]:'';};
+  return valCols.map(vc=>{
+    const ac=vc+1, ibi=[], attr=[];
+    for(let i=hdr+1;i<rows.length;i++){
+      const r=rows[i]; if(!r) continue; const v=r[vc];
+      if(v!=null && v!==''){const n=parseFloat(v); if(!isNaN(n)){ibi.push(n);attr.push(r[ac]||'');}}
+    }
+    return {
+      name:(get('First Name',vc)+' '+get('Last Name',vc)).trim(),
+      dob:get('Date of Birth',vc), gender:get('Gender',vc),
+      date:get('Date Created',vc), type:get('Type',vc),
+      sdnn:+get('SDNN',vc), rmssd:+get('RMSSD',vc), tp:+get('Total Power',vc),
+      vlf:+get('Very Low Frequency',vc), lf:+get('Low Frequency',vc), hf:+get('High Frequency',vc),
+      coh:+get('Normal Coherence',vc), mhr:+get('Mean Heart Rate',vc), mhrr:+get('Mean Heart Rate Range',vc),
+      ibi, attr
+    };
+  });
+}
+function nnFromSession(s){
+  const nn=[];
+  for(let i=0;i<s.ibi.length;i++){ if(s.attr[i]==='L'){const v=s.ibi[i]; if(v>260&&v<2000)nn.push(v);} }
+  return nn;
+}
+function poincareRR(nn){
+  const d=[]; for(let i=1;i<nn.length;i++)d.push(nn[i]-nn[i-1]);
+  const sdsd=_std(d,1), sdnn=_std(nn,1), sd1=Math.sqrt(0.5)*sdsd;
+  const sd2=Math.sqrt(Math.max(0,2*sdnn*sdnn-0.5*sdsd*sdsd));
+  return {sd1,sd2,ratio:sd2>0?sd1/sd2:0,area:Math.PI*sd1*sd2,sdnn,rmssd:Math.sqrt(_mean(d.map(x=>x*x)))};
+}
+function stressIndexRR(nn){
+  const binw=50, mn=Math.min.apply(null,nn), mx=Math.max.apply(null,nn);
+  const lo=Math.floor(mn/binw)*binw, nb=Math.max(1,Math.round((Math.ceil(mx/binw)*binw-lo)/binw));
+  const hist=new Array(nb).fill(0);
+  nn.forEach(v=>{let k=Math.floor((v-lo)/binw); if(k>=nb)k=nb-1; if(k<0)k=0; hist[k]++;});
+  let km=0; for(let i=1;i<hist.length;i++)if(hist[i]>hist[km])km=i;
+  const Mo=(lo+(km+0.5)*binw)/1000, AMo=hist[km]/nn.length*100, MxDMn=(mx-mn)/1000;
+  return {SI:(Mo>0&&MxDMn>0)?AMo/(2*Mo*MxDMn):NaN, Mo, AMo, MxDMn, hist, lo, binw};
+}
+function dfaAlpha1(x,smin,smax){
+  smin=smin||4; smax=smax||16; const N=x.length; if(N<50)return NaN;
+  const m=_mean(x); const y=[]; let s=0; for(let i=0;i<N;i++){s+=x[i]-m;y.push(s);}
+  const sc=[],F=[];
+  for(let n=smin;n<=smax;n++){
+    const nw=Math.floor(N/n); if(nw<2)continue; let acc=0;
+    for(let w=0;w<nw;w++){
+      let sx=0,sy=0,sxx=0,sxy=0;
+      for(let t=0;t<n;t++){const yt=y[w*n+t];sx+=t;sy+=yt;sxx+=t*t;sxy+=t*yt;}
+      const b=(n*sxy-sx*sy)/(n*sxx-sx*sx), a=(sy-b*sx)/n;
+      let rss=0; for(let t=0;t<n;t++){const e=y[w*n+t]-(a+b*t);rss+=e*e;}
+      acc+=rss/n;
+    }
+    F.push(Math.sqrt(acc/nw)); sc.push(n);
+  }
+  if(sc.length<4)return NaN;
+  return _slope(sc.map(Math.log),F.map(Math.log));
+}
+function alpha1Read(a){
+  if(isNaN(a))return '';
+  if(a<0.75)return 'α1 &lt; 0,75: correlazioni frattali ridotte (in runner correla con soglia lattacida; a riposo può indicare segnale rumoroso o stress).';
+  if(a<=1.15)return 'α1 ~1,0: organizzazione frattale fisiologica ottimale (sistema sano e adattivo).';
+  if(a<=1.5)return 'α1 elevato: segnale più "liscio"/correlato — tipico di respirazione lenta; se non guidata, valutare rigidità autonomica.';
+  return 'α1 &gt; 1,5: forte correlazione (respirazione molto lenta/apnea) o perdita di complessità.';
+}
+
+/* plot REALI dai battiti */
+function drawPoincareReal(nn, pc){
+  const W=320,H=320,pad=40, el=document.getElementById('poincare');
+  const m=_mean(nn), span=Math.max(pc.sd1,pc.sd2,30)*4, lo=m-span, hi=m+span;
+  const sx=v=>pad+(v-lo)/(hi-lo)*(W-2*pad), sy=v=>H-pad-(v-lo)/(hi-lo)*(H-2*pad);
+  let s=`<rect x="${pad}" y="${pad}" width="${W-2*pad}" height="${H-2*pad}" fill="#fff" stroke="#e3ecef"/>`;
+  s+=`<line x1="${sx(lo).toFixed(1)}" y1="${sy(lo).toFixed(1)}" x2="${sx(hi).toFixed(1)}" y2="${sy(hi).toFixed(1)}" stroke="#cfdde1" stroke-dasharray="4 4"/>`;
+  for(let i=1;i<nn.length;i++){
+    const x=nn[i-1],y=nn[i]; if(x<lo||x>hi||y<lo||y>hi)continue;
+    s+=`<circle cx="${sx(x).toFixed(1)}" cy="${sy(y).toFixed(1)}" r="1.7" fill="#3f8ba0" opacity="0.4"/>`;
+  }
+  const cx=sx(m), cy=sy(m), ppm=(sx(m+100)-sx(m))/100, rx=pc.sd2*ppm, ry=pc.sd1*ppm;
+  s+=`<g transform="rotate(-45 ${cx.toFixed(1)} ${cy.toFixed(1)})">`;
+  s+=`<ellipse cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" fill="none" stroke="#2c6475" stroke-width="2"/>`;
+  s+=`<line x1="${cx.toFixed(1)}" y1="${cy.toFixed(1)}" x2="${(cx+rx).toFixed(1)}" y2="${cy.toFixed(1)}" stroke="#b3201e" stroke-width="1.6"/>`;
+  s+=`<line x1="${cx.toFixed(1)}" y1="${cy.toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(cy-ry).toFixed(1)}" stroke="#1b8a5a" stroke-width="1.6"/></g>`;
+  s+=`<text x="${pad}" y="${H-10}" font-size="11" fill="#65787f">RRₙ (ms)</text>`;
+  s+=`<text x="14" y="${pad+2}" font-size="11" fill="#65787f" transform="rotate(-90 14 ${pad+2})">RRₙ₊₁ (ms)</text>`;
+  s+=`<text x="${pad+6}" y="${pad+14}" font-size="11" fill="#1b8a5a" font-weight="700">SD1 ${pc.sd1.toFixed(0)} ms</text>`;
+  s+=`<text x="${pad+6}" y="${pad+28}" font-size="11" fill="#b3201e" font-weight="700">SD2 ${pc.sd2.toFixed(0)} ms</text>`;
+  s+=`<text x="${W-pad}" y="${pad+14}" font-size="10" fill="#65787f" text-anchor="end">${nn.length} battiti reali</text>`;
+  el.innerHTML=s;
+}
+function drawSIHistReal(sx_, si){
+  const W=320,H=320,pad=40, base=H-pad, el=document.getElementById('siHist');
+  const lo=sx_.lo, binw=sx_.binw, hist=sx_.hist, hi=lo+hist.length*binw;
+  const sc=v=>pad+(v-lo)/(hi-lo)*(W-2*pad), maxp=Math.max.apply(null,hist)||1;
+  let s=`<rect x="${pad}" y="${pad}" width="${W-2*pad}" height="${H-2*pad}" fill="#fff" stroke="#e3ecef"/>`;
+  const moMs=si.Mo*1000;
+  hist.forEach((c,i)=>{
+    const x1=sc(lo+i*binw), x2=sc(lo+(i+1)*binw), h=c/maxp*(H-2*pad-26);
+    const modal=Math.abs(lo+(i+0.5)*binw-moMs)<binw/2;
+    s+=`<rect x="${x1.toFixed(1)}" y="${(base-h).toFixed(1)}" width="${Math.max(1,x2-x1-1).toFixed(1)}" height="${h.toFixed(1)}" fill="${modal?'#e8682a':'#9fc4cf'}"/>`;
+  });
+  const lo2=sc(lo), hi2=sc(hi);
+  s+=`<line x1="${lo2.toFixed(1)}" y1="${pad+18}" x2="${hi2.toFixed(1)}" y2="${pad+18}" stroke="#b3201e" stroke-width="1.5"/>`;
+  s+=`<text x="${((lo2+hi2)/2).toFixed(1)}" y="${pad+12}" font-size="10" fill="#b3201e" text-anchor="middle">MxDMn = ${Math.round(si.MxDMn*1000)} ms</text>`;
+  const cmo=sc(moMs);
+  s+=`<line x1="${cmo.toFixed(1)}" y1="${pad+24}" x2="${cmo.toFixed(1)}" y2="${base}" stroke="#2c6475" stroke-dasharray="3 3"/>`;
+  s+=`<text x="${(cmo+4).toFixed(1)}" y="${base-6}" font-size="10" fill="#2c6475">Mo ${Math.round(moMs)} ms · AMo ${si.AMo.toFixed(0)}%</text>`;
+  s+=`<text x="${pad}" y="${H-10}" font-size="11" fill="#65787f">RR (ms)</text>`;
+  s+=`<text x="${W-pad}" y="${H-10}" font-size="13" fill="#1f2d33" text-anchor="end" font-weight="700">SI ${si.SI.toFixed(0)}</text>`;
+  el.innerHTML=s;
+}
+
+/* wiring file input */
+function _set(id,v){const e=document.getElementById(id); if(e!=null&&v!=null&&!(typeof v==='number'&&isNaN(v)))e.value=(typeof v==='number')?Math.round(v*10)/10:v;}
+function ageFrom(dob,refDate){
+  const p=(dob||'').split('/'); if(p.length<3)return null;
+  const b=new Date(+p[2],+p[0]-1,+p[1]); const r=refDate?new Date(refDate):new Date();
+  if(isNaN(b))return null; let a=r.getFullYear()-b.getFullYear();
+  if(r.getMonth()<b.getMonth()||(r.getMonth()===b.getMonth()&&r.getDate()<b.getDate()))a--;
+  return a;
+}
+function buildSessionPickers(){
+  if(!RAW||!RAW.length){document.getElementById('importMsg').textContent='File non riconosciuto come export emWave.';return;}
+  const idx=RAW.map((s,i)=>i);
+  const ton=idx.filter(i=>!/Deep Breathing/.test(RAW[i].type));
+  const fas=idx.filter(i=>/Deep Breathing/.test(RAW[i].type));
+  const opt=i=>`<option value="${i}">${RAW[i].date} · ${RAW[i].name}</option>`;
+  document.getElementById('tonicSel').innerHTML=ton.map(opt).join('');
+  document.getElementById('fasicSel').innerHTML='<option value="">— nessuna —</option>'+fas.map(opt).join('');
+  document.getElementById('sessionPick').style.display='';
+  document.getElementById('importMsg').innerHTML=`Caricate <b>${RAW.length}</b> sessioni (${ton.length} toniche, ${fas.length} fasiche). Seleziona quelle da analizzare: i valori di Poincaré/Stress Index sono calcolati dai <b>battiti reali</b>.`;
+  document.getElementById('tonicSel').onchange=applyImport;
+  document.getElementById('fasicSel').onchange=applyImport;
+  applyImport();
+}
+function applyImport(){
+  const ti=+document.getElementById('tonicSel').value, t=RAW[ti];
+  _set('name',t.name); _set('date',t.date);
+  const sexEl=document.getElementById('sex'); if(/F/i.test(t.gender))sexEl.value='female'; else if(/M/i.test(t.gender))sexEl.value='male';
+  const age=ageFrom(t.dob,t.date); if(age)_set('age',age);
+  _set('sdnn',t.sdnn);_set('rmssd',t.rmssd);_set('tp',t.tp);_set('vlf',t.vlf);_set('lf',t.lf);_set('hf',t.hf);
+  _set('coh',t.coh);_set('hr',t.mhr); if(t.hf>0)_set('lfhf',t.lf/t.hf);
+  TONIC_RR=nnFromSession(t);
+  const fv=document.getElementById('fasicSel').value;
+  if(fv!==''){const fs=RAW[+fv]; _set('hrF',fs.mhr);_set('sdnnF',fs.sdnn);_set('rmssdF',fs.rmssd);_set('mhrr',fs.mhrr);_set('cohF',fs.coh);}
+  calc();
+}
+window.addEventListener('DOMContentLoaded',()=>{
+  const fi=document.getElementById('csvFile');
+  if(fi)fi.addEventListener('change',ev=>{
+    const f=ev.target.files[0]; if(!f)return;
+    const rd=new FileReader();
+    rd.onload=()=>{RAW=parseEmwaveCSV(rd.result); buildSessionPickers();};
+    rd.readAsText(f);
+  });
+});
+
 /* ---------- CALCOLO ---------- */
 function calc(){
   const sex=txt('sex'), age=num('age')||50, nm=txt('name'), dt=txt('date');
@@ -595,14 +775,25 @@ function calc(){
     tonicInvFlagEl.style.display = 'none';
   }
 
-  // --- indici geometrici: Poincaré + Stress Index (da SDNN/RMSSD/FC media) ---
+  // --- indici geometrici: Poincaré + Stress Index ---
   const meanRRms = hr>0 ? 60000/hr : 0;
-  const pc = poincare(sdnn,rmssd);
-  const si = stressIndex(sdnn, meanRRms);
   const sd1Ref = band.rmssd.map(v=>v/Math.SQRT2);
   const sd2Ref = band.sdnn.map((v,i)=>Math.sqrt(Math.max(0, 2*v*v - 0.5*band.rmssd[i]*band.rmssd[i])));
-  drawPoincare(meanRRms, pc.sd1, pc.sd2);
-  drawSIHist(meanRRms, sdnn, si.SI);
+  const exact = TONIC_RR && TONIC_RR.length>=20;
+  let pc, si, alpha1=NaN;
+  if(exact){
+    pc = poincareRR(TONIC_RR);
+    const sx = stressIndexRR(TONIC_RR);
+    si = {SI:sx.SI, Mo:sx.Mo, AMo:sx.AMo, MxDMn:sx.MxDMn};
+    alpha1 = dfaAlpha1(TONIC_RR);
+    drawPoincareReal(TONIC_RR, pc);
+    drawSIHistReal(sx, si);
+  } else {
+    pc = poincare(sdnn,rmssd);
+    si = stressIndex(sdnn, meanRRms);
+    drawPoincare(meanRRms, pc.sd1, pc.sd2);
+    drawSIHist(meanRRms, sdnn, si.SI);
+  }
   const sevSD1=sevFromVoss(pc.sd1, sd1Ref), sevSD2=sevFromVoss(pc.sd2, sd2Ref);
   const sib=siBand(si.SI);
   const grows=[
@@ -612,8 +803,12 @@ function calc(){
     {n:'Area ellisse', v:Math.round(pc.area).toLocaleString('it-IT')+' ms²', ref:'∝ SDNN · Total Power', tg:'', lvl:'', bar:'', read:'Variabilità globale (correla con SDNN e Total Power).'},
     {n:'Stress Index', v:si.SI.toFixed(0)+' c.u.', ref:'≈80–150 equilibrio <span class="ref">· Baevsky</span>', tg:`<span class="siband" style="background:${sib.col}">${sib.lbl}</span>`, lvl:'', bar:'', read:sib.txt},
   ];
+  if(exact && !isNaN(alpha1)) grows.push(
+    {n:'DFA α1', v:alpha1.toFixed(2), ref:'~1,0 ottimale <span class="ref">· Peng</span>', tg:'', lvl:'', bar:'', read:alpha1Read(alpha1)});
   document.getElementById('geomBody').innerHTML=grows.map(r=>`<tr><td><b>${r.n}</b></td><td class="val">${r.v}</td><td class="ref">${r.ref}</td><td>${r.tg} <span class="ref">${r.lvl}</span>${r.bar}</td><td class="ref">${r.read}</td></tr>`).join('');
-  document.getElementById('geomNote').innerHTML=`<b>Come sono calcolati.</b> <b>SD1</b> ed <b>SD2</b> derivano da SDNN e RMSSD con le identità di Brennan (2001): SD1 = RMSSD/√2, SD2 = √(2·SDNN² − SD1²) — relazione <i>esatta</i>, non una stima. Lo <b>Stress Index</b> di Baevsky [SI = AMo / (2·Mo·MxDMn)] richiede la distribuzione dei singoli intervalli RR, che l'EnWave non esporta: è quindi <b>stimato</b> assumendo distribuzione gaussiana — Mo = RR medio (60000/FC), AMo = % di battiti nel bin modale da 50 ms, MxDMn ≈ 5,5·SDNN. L'istogramma è la distribuzione <i>ricostruita</i>, non i battiti reali. Riferimenti: Brennan 2001 (IEEE TBME); Baevsky 2008; Shaffer &amp; Ginsberg 2017 (Front. Public Health).`;
+  document.getElementById('geomNote').innerHTML = exact
+    ? `<b>Calcolati dai battiti reali</b> (${TONIC_RR.length} intervalli RR normali, artefatti esclusi) della sessione tonica importata. <b>SD1/SD2</b>: assi della nuvola di Poincaré effettiva. <b>Stress Index</b> di Baevsky [SI = AMo/(2·Mo·MxDMn)] dall'istogramma reale a bin 50 ms. <b>DFA α1</b>: pendenza frattale (scale 4–16 battiti). Valori esatti, non stimati. Rif.: Brennan 2001; Baevsky 2008; Peng 1995; Shaffer &amp; Ginsberg 2017.`
+    : `<b>Come sono calcolati.</b> <b>SD1</b> ed <b>SD2</b> derivano da SDNN e RMSSD con le identità di Brennan (2001): SD1 = RMSSD/√2, SD2 = √(2·SDNN² − SD1²) — relazione <i>esatta</i>. Lo <b>Stress Index</b> di Baevsky è qui <b>stimato</b> (gaussiana, Mo = 60000/FC, AMo su bin 50 ms, MxDMn ≈ 5,5·SDNN); l'istogramma è ricostruito. Per i valori reali importa l'export emWave in alto. Rif.: Brennan 2001; Baevsky 2008; Shaffer &amp; Ginsberg 2017.`;
 
   // --- fasico ---
   const sdnnF=num('sdnnF'),rmssdF=num('rmssdF'),cohF=num('cohF'),hrF=num('hrF'),mhrr=num('mhrr'),mhrrMin=num('mhrrMin');

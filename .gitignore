@@ -1,0 +1,7 @@
+# Dati paziente e analisi locale — NON pubblicare (repo pubblico)
+analysis/
+*.csv
+patient_reminder.html
+hrv_self_coherence.html
+out/
+__pycache__/

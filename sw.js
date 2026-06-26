@@ -1,4 +1,4 @@
-const CACHE = 'coerenza-hrv-v2';
+const CACHE = 'coerenza-hrv-v3';
 const ASSETS = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
