@@ -68,6 +68,13 @@
   .spectro .b b{font-size:20px;display:block;color:var(--teal-d)}
   .spectro .b small{color:var(--muted);font-size:11px}
 
+  .geomgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:6px}
+  .geomgrid .panel{background:#f7fafb;border:1px solid var(--line);border-radius:10px;padding:14px}
+  .geomgrid .panel h3{margin:0 0 4px;font-size:13px;color:var(--teal-d);text-transform:uppercase;letter-spacing:.4px}
+  .geomgrid .panel .sub{font-size:11px;color:var(--muted);margin-bottom:8px}
+  .geomgrid svg{width:100%;height:auto;display:block;background:#fff;border-radius:6px}
+  .siband{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11.5px;font-weight:700;color:#fff}
+
   .commentary p{margin:0 0 11px}
   .commentary .lead{font-size:15px}
   .flag{background:#fff8e6;border:1px solid #f0d98a;border-radius:9px;padding:12px 14px;
@@ -182,6 +189,28 @@
     <div class="flag" id="tonicInversionFlag" style="display:none;margin-top:12px"></div>
   </div>
 
+  <!-- POINCARÉ & STRESS INDEX -->
+  <div class="card" id="geomCard">
+    <h2>Indici geometrici e non lineari — Poincaré & Stress Index</h2>
+    <div class="geomgrid">
+      <div class="panel">
+        <h3>Poincaré Plot</h3>
+        <div class="sub">Nuvola RR<sub>n</sub> vs RR<sub>n+1</sub> · SD1 (vagale, verde) × SD2 (lenta, rosso)</div>
+        <svg id="poincare" viewBox="0 0 320 320"></svg>
+      </div>
+      <div class="panel">
+        <h3>Istogramma di Baevsky</h3>
+        <div class="sub">Distribuzione RR ricostruita · Mo, AMo, MxDMn → Stress Index</div>
+        <svg id="siHist" viewBox="0 0 320 320"></svg>
+      </div>
+    </div>
+    <table class="bk" style="margin-top:16px">
+      <thead><tr><th>Indice</th><th>Valore</th><th>Riferimento</th><th style="width:140px">Livello</th><th>Lettura</th></tr></thead>
+      <tbody id="geomBody"></tbody>
+    </table>
+    <div class="hint" id="geomNote" style="margin-top:10px"></div>
+  </div>
+
   <!-- INPUT FASICO -->
   <div class="card noprint">
     <span class="sec-title">2 · Test fasico — deep breathing (1 min, 6/min)</span>
@@ -230,6 +259,8 @@
       <b>ipotetiche</b>: individuano lo stato e la reattività che meglio correlano col pattern dei dati secondo il
       Modello Integrato Self Coherence. Tonico calibrato su scala VOSS (SDNN/RMSSD) e scala Self Coherence per popolazione (Total Power),
       registrazioni 5 min; fasico letto come risposta alla perturbazione respiratoria standardizzata (Harmat).
+      <b>Indici geometrici:</b> SD1/SD2 sono identità matematiche di SDNN/RMSSD (Brennan 2001); lo Stress Index è <b>stimato</b> dai parametri di sintesi
+      (gaussiana, bin 50 ms, MxDMn≈5,5·SDNN) perché l'EnWave non esporta la serie RR — vanno letti come indicazioni di tendenza, non come misure sul tracciato reale.
       Strumento di supporto al ragionamento clinico, non referto diagnostico.
     </div>
   </div>
@@ -416,6 +447,101 @@ function strategyFor(idx, coherenceWeak){
   return out;
 }
 
+/* ---------- INDICI GEOMETRICI: Poincaré + Stress Index ---------- */
+// erf — approssimazione di Abramowitz & Stegun 7.1.26
+function erf(x){
+  const s=x<0?-1:1; x=Math.abs(x);
+  const p=0.3275911,a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429;
+  const t=1/(1+p*x);
+  const y=1-((((a5*t+a4)*t+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+  return s*y;
+}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+// Poincaré da SDNN/RMSSD (identità di Brennan 2001): SD1=RMSSD/√2, SD2=√(2·SDNN²−SD1²)
+function poincare(sdnn,rmssd){
+  const sd1=rmssd/Math.SQRT2;
+  const sd2=Math.sqrt(Math.max(0, 2*sdnn*sdnn - sd1*sd1));
+  return {sd1, sd2, ratio: sd2>0?sd1/sd2:0, area: Math.PI*sd1*sd2};
+}
+// Stress Index di Baevsky stimato da statistiche di sintesi (gaussiana, bin 50 ms, MxDMn≈5,5·SDNN)
+function stressIndex(sdnn, meanRRms){
+  if(meanRRms<=0||sdnn<=0) return {Mo:0,AMo:0,MxDMn:0,SI:0};
+  const Mo=meanRRms/1000;                     // moda ≈ media (s)
+  const AMo=100*erf(25/(sdnn*Math.SQRT2));     // % di battiti entro il bin 50 ms attorno alla moda
+  const MxDMn=5.5*sdnn/1000;                   // range di variazione stimato (s)
+  return {Mo, AMo, MxDMn, SI: AMo/(2*Mo*MxDMn)};
+}
+function siBand(si){
+  if(si<50)  return {lbl:'Para / molto rilassato', col:'#1b8a5a', txt:'Stress Index basso: predominanza parasimpatica — tipico di riposo profondo, atleti, bradicardia da endurance. Da contestualizzare: con Total Power molto basso può indicare ipotono generale, non solo rilassamento.'};
+  if(si<=150)return {lbl:'Equilibrio', col:'#7cb342', txt:'Stress Index nel range fisiologico a riposo (≈80–150 c.u.): buon bilanciamento simpato-vagale, attivazione ortosimpatica contenuta.'};
+  if(si<=500)return {lbl:'Attivazione orto', col:'#f4a82c', txt:'Stress Index elevato: attivazione ortosimpatica marcata, coerente con carico interno / fase di stress. Valutare recupero e fattori che mantengono il drive simpatico.'};
+  return {lbl:'Iperattivazione orto', col:'#b3201e', txt:'Stress Index molto alto: forte predominanza ortosimpatica, sistema rigido e centralizzato. Recupero compromesso — bersaglio prioritario di intervento.'};
+}
+function ratioRead(r){
+  if(r<0.25) return 'SD2 nettamente &gt; SD1: variabilità dominata dalla regolazione lenta; componente vagale rapida modesta in proporzione.';
+  if(r<=0.5) return 'Rapporto SD1/SD2 nel range fisiologico a riposo (~0,30–0,50): buona organizzazione tra variabilità rapida (vago) e lenta.';
+  if(r<=1.0) return 'SD1 relativamente alto rispetto a SD2: respirazione lenta/risonanza, oppure — se SD2 è contratto — perdita di variabilità a lungo termine.';
+  return 'SD1 &gt; SD2: pattern atipico (nuvola "tonda"). Sospetta disorganizzazione autonomica, aritmia o artefatti — verificare il tracciato.';
+}
+function drawPoincare(meanRRms, sd1, sd2){
+  const W=320,H=320,pad=40, el=document.getElementById('poincare');
+  if(meanRRms<=0){el.innerHTML='';return;}
+  const span=Math.max(sd1,sd2,30)*4;
+  const lo=meanRRms-span, hi=meanRRms+span;
+  const sx=v=>pad+(v-lo)/(hi-lo)*(W-2*pad);
+  const sy=v=>H-pad-(v-lo)/(hi-lo)*(H-2*pad);
+  let s=`<rect x="${pad}" y="${pad}" width="${W-2*pad}" height="${H-2*pad}" fill="#fff" stroke="#e3ecef"/>`;
+  s+=`<line x1="${sx(lo).toFixed(1)}" y1="${sy(lo).toFixed(1)}" x2="${sx(hi).toFixed(1)}" y2="${sy(hi).toFixed(1)}" stroke="#cfdde1" stroke-dasharray="4 4"/>`;
+  const rnd=mulberry32(Math.round(meanRRms+sd1*7+sd2*13)||1);
+  const gauss=()=>{let u=0,v=0;while(u===0)u=rnd();while(v===0)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);};
+  for(let i=0;i<140;i++){
+    const u=gauss()*sd2, w=gauss()*sd1;
+    const rn=meanRRms+(u-w)/Math.SQRT2, rn1=meanRRms+(u+w)/Math.SQRT2;
+    s+=`<circle cx="${sx(rn).toFixed(1)}" cy="${sy(rn1).toFixed(1)}" r="2" fill="#3f8ba0" opacity="0.30"/>`;
+  }
+  const cx=sx(meanRRms), cy=sy(meanRRms);
+  const ppm=(sx(meanRRms+100)-sx(meanRRms))/100;          // px per ms
+  const rx=sd2*ppm, ry=sd1*ppm;
+  s+=`<g transform="rotate(-45 ${cx.toFixed(1)} ${cy.toFixed(1)})">`;
+  s+=`<ellipse cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" fill="none" stroke="#2c6475" stroke-width="2"/>`;
+  s+=`<line x1="${cx.toFixed(1)}" y1="${cy.toFixed(1)}" x2="${(cx+rx).toFixed(1)}" y2="${cy.toFixed(1)}" stroke="#b3201e" stroke-width="1.6"/>`;
+  s+=`<line x1="${cx.toFixed(1)}" y1="${cy.toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(cy-ry).toFixed(1)}" stroke="#1b8a5a" stroke-width="1.6"/></g>`;
+  s+=`<text x="${pad}" y="${H-10}" font-size="11" fill="#65787f">RRₙ (ms)</text>`;
+  s+=`<text x="14" y="${pad+2}" font-size="11" fill="#65787f" transform="rotate(-90 14 ${pad+2})">RRₙ₊₁ (ms)</text>`;
+  s+=`<text x="${pad+6}" y="${pad+14}" font-size="11" fill="#1b8a5a" font-weight="700">SD1 ${sd1.toFixed(0)} ms</text>`;
+  s+=`<text x="${pad+6}" y="${pad+28}" font-size="11" fill="#b3201e" font-weight="700">SD2 ${sd2.toFixed(0)} ms</text>`;
+  el.innerHTML=s;
+}
+function drawSIHist(meanRRms, sdnn, si){
+  const W=320,H=320,pad=40, base=H-pad, el=document.getElementById('siHist');
+  if(meanRRms<=0||sdnn<=0){el.innerHTML='';return;}
+  const lo=meanRRms-3.5*sdnn, hi=meanRRms+3.5*sdnn, binW=50;
+  const start=Math.floor(lo/binW)*binW;
+  const sx=v=>pad+(v-lo)/(hi-lo)*(W-2*pad);
+  let s=`<rect x="${pad}" y="${pad}" width="${W-2*pad}" height="${H-2*pad}" fill="#fff" stroke="#e3ecef"/>`;
+  const bins=[]; let maxp=0;
+  for(let c=start;c<hi;c+=binW){
+    const p=0.5*(erf((c+binW-meanRRms)/(sdnn*Math.SQRT2))-erf((c-meanRRms)/(sdnn*Math.SQRT2)))*100;
+    bins.push({c,p}); if(p>maxp)maxp=p;
+  }
+  bins.forEach(b=>{
+    const x1=sx(b.c), x2=sx(b.c+binW), h=(b.p/Math.max(maxp,1e-6))*(H-2*pad-26);
+    const modal=Math.abs(b.c+binW/2-meanRRms)<binW/2;
+    s+=`<rect x="${x1.toFixed(1)}" y="${(base-h).toFixed(1)}" width="${Math.max(1,x2-x1-1).toFixed(1)}" height="${h.toFixed(1)}" fill="${modal?'#e8682a':'#9fc4cf'}"/>`;
+  });
+  const mlo=sx(meanRRms-2.75*sdnn), mhi=sx(meanRRms+2.75*sdnn);
+  s+=`<line x1="${mlo.toFixed(1)}" y1="${pad+18}" x2="${mhi.toFixed(1)}" y2="${pad+18}" stroke="#b3201e" stroke-width="1.5"/>`;
+  s+=`<line x1="${mlo.toFixed(1)}" y1="${pad+14}" x2="${mlo.toFixed(1)}" y2="${pad+22}" stroke="#b3201e" stroke-width="1.5"/>`;
+  s+=`<line x1="${mhi.toFixed(1)}" y1="${pad+14}" x2="${mhi.toFixed(1)}" y2="${pad+22}" stroke="#b3201e" stroke-width="1.5"/>`;
+  s+=`<text x="${((mlo+mhi)/2).toFixed(1)}" y="${pad+12}" font-size="10" fill="#b3201e" text-anchor="middle">MxDMn ≈ ${(5.5*sdnn).toFixed(0)} ms</text>`;
+  const cmo=sx(meanRRms);
+  s+=`<line x1="${cmo.toFixed(1)}" y1="${pad+24}" x2="${cmo.toFixed(1)}" y2="${base}" stroke="#2c6475" stroke-dasharray="3 3"/>`;
+  s+=`<text x="${(cmo+4).toFixed(1)}" y="${base-6}" font-size="10" fill="#2c6475">Mo ${Math.round(meanRRms)} ms</text>`;
+  s+=`<text x="${pad}" y="${H-10}" font-size="11" fill="#65787f">RR (ms)</text>`;
+  s+=`<text x="${W-pad}" y="${H-10}" font-size="13" fill="#1f2d33" text-anchor="end" font-weight="700">SI ${si.toFixed(0)}</text>`;
+  el.innerHTML=s;
+}
+
 /* ---------- CALCOLO ---------- */
 function calc(){
   const sex=txt('sex'), age=num('age')||50, nm=txt('name'), dt=txt('date');
@@ -468,6 +594,26 @@ function calc(){
   } else {
     tonicInvFlagEl.style.display = 'none';
   }
+
+  // --- indici geometrici: Poincaré + Stress Index (da SDNN/RMSSD/FC media) ---
+  const meanRRms = hr>0 ? 60000/hr : 0;
+  const pc = poincare(sdnn,rmssd);
+  const si = stressIndex(sdnn, meanRRms);
+  const sd1Ref = band.rmssd.map(v=>v/Math.SQRT2);
+  const sd2Ref = band.sdnn.map((v,i)=>Math.sqrt(Math.max(0, 2*v*v - 0.5*band.rmssd[i]*band.rmssd[i])));
+  drawPoincare(meanRRms, pc.sd1, pc.sd2);
+  drawSIHist(meanRRms, sdnn, si.SI);
+  const sevSD1=sevFromVoss(pc.sd1, sd1Ref), sevSD2=sevFromVoss(pc.sd2, sd2Ref);
+  const sib=siBand(si.SI);
+  const grows=[
+    {n:'SD1', v:pc.sd1.toFixed(1)+' ms', ref:`${sd1Ref[0].toFixed(0)} – <b>${sd1Ref[1].toFixed(0)}</b> – ${sd1Ref[2].toFixed(0)} ms <span class="ref">· VOSS RMSSD/√2</span>`, tg:tag(nearestState(sevSD1)), lvl:levelLabel(sevSD1), bar:barVoss(pc.sd1,sd1Ref), read:'Variabilità vagale rapida, beat-to-beat (≡ RMSSD/√2).'},
+    {n:'SD2', v:pc.sd2.toFixed(1)+' ms', ref:`${sd2Ref[0].toFixed(0)} – <b>${sd2Ref[1].toFixed(0)}</b> – ${sd2Ref[2].toFixed(0)} ms <span class="ref">· da VOSS</span>`, tg:tag(nearestState(sevSD2)), lvl:levelLabel(sevSD2), bar:barVoss(pc.sd2,sd2Ref), read:'Variabilità lenta non vagale (orto + regolazione lenta).'},
+    {n:'SD1/SD2', v:pc.ratio.toFixed(2), ref:'~0,30–0,50 a riposo', tg:'', lvl:'', bar:'', read:ratioRead(pc.ratio)},
+    {n:'Area ellisse', v:Math.round(pc.area).toLocaleString('it-IT')+' ms²', ref:'∝ SDNN · Total Power', tg:'', lvl:'', bar:'', read:'Variabilità globale (correla con SDNN e Total Power).'},
+    {n:'Stress Index', v:si.SI.toFixed(0)+' c.u.', ref:'≈80–150 equilibrio <span class="ref">· Baevsky</span>', tg:`<span class="siband" style="background:${sib.col}">${sib.lbl}</span>`, lvl:'', bar:'', read:sib.txt},
+  ];
+  document.getElementById('geomBody').innerHTML=grows.map(r=>`<tr><td><b>${r.n}</b></td><td class="val">${r.v}</td><td class="ref">${r.ref}</td><td>${r.tg} <span class="ref">${r.lvl}</span>${r.bar}</td><td class="ref">${r.read}</td></tr>`).join('');
+  document.getElementById('geomNote').innerHTML=`<b>Come sono calcolati.</b> <b>SD1</b> ed <b>SD2</b> derivano da SDNN e RMSSD con le identità di Brennan (2001): SD1 = RMSSD/√2, SD2 = √(2·SDNN² − SD1²) — relazione <i>esatta</i>, non una stima. Lo <b>Stress Index</b> di Baevsky [SI = AMo / (2·Mo·MxDMn)] richiede la distribuzione dei singoli intervalli RR, che l'EnWave non esporta: è quindi <b>stimato</b> assumendo distribuzione gaussiana — Mo = RR medio (60000/FC), AMo = % di battiti nel bin modale da 50 ms, MxDMn ≈ 5,5·SDNN. L'istogramma è la distribuzione <i>ricostruita</i>, non i battiti reali. Riferimenti: Brennan 2001 (IEEE TBME); Baevsky 2008; Shaffer &amp; Ginsberg 2017 (Front. Public Health).`;
 
   // --- fasico ---
   const sdnnF=num('sdnnF'),rmssdF=num('rmssdF'),cohF=num('cohF'),hrF=num('hrF'),mhrr=num('mhrr'),mhrrMin=num('mhrrMin');
