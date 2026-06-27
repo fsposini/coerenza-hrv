@@ -1,4 +1,4 @@
-const CACHE = 'coerenza-hrv-v4-editor';
+const CACHE = 'coerenza-hrv-v5-interp';
 const ASSETS = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
