@@ -602,10 +602,35 @@ let FASIC_RR = null;   // serie RR (NN, ms) della sessione fasica selezionata
 let TONIC_BEATS = null, FASIC_BEATS = null;  // battiti editabili {rr,excl,hard}
 const EDIT = {};       // geometria per-svg per il mapping click→battito
 let TONIC_INFO = null; // qualità: n° RR, artefatti, durata
+let TONIC_HAS_EMWAVE_FREQ = false; // true se la sessione tonica viene da emWave (frequenze già presenti)
 
 function _mean(a){return a.reduce((s,x)=>s+x,0)/a.length;}
 function _std(a,ddof){const m=_mean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)*(x-m),0)/(a.length-(ddof||0)));}
 function _slope(x,y){const mx=_mean(x),my=_mean(y);let n=0,d=0;for(let i=0;i<x.length;i++){n+=(x[i]-mx)*(y[i]-my);d+=(x[i]-mx)*(x[i]-mx);}return n/d;}
+
+/* ---- Dominio in frequenza dai RR (per dati da fascia, senza emWave) ----
+   FFT su tachogramma ricampionato 4 Hz + Hann, poi CALIBRAZIONE sulla scala
+   emWave (fattori ricavati da 49 test appaiati di Federico): LF e HF ~3%, VLF/TP
+   ~5-12% — la VLF resta una stima, com'è inevitabile in 5 minuti. */
+const FREQ_CAL = { vlf:0.334, lf:0.380, hf:0.373, tp:0.3856 };
+function _fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){const tr=re[i];re[i]=re[j];re[j]=tr;const ti=im[i];im[i]=im[j];im[j]=ti;}}for(let len=2;len<=n;len<<=1){const ang=-2*Math.PI/len,wr=Math.cos(ang),wi=Math.sin(ang);for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<len/2;k++){const a=i+k,b=i+k+len/2;const vr=re[b]*cr-im[b]*ci,vi=re[b]*ci+im[b]*cr;re[b]=re[a]-vr;im[b]=im[a]-vi;re[a]+=vr;im[a]+=vi;const ncr=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=ncr;}}}}
+function freqDomainCal(nn){
+  if(!nn || nn.length<30) return null;
+  const fs=4; const t=[0]; for(let k=1;k<nn.length;k++) t[k]=t[k-1]+nn[k-1]/1000;
+  const dur=t[t.length-1]; if(dur<20) return null;
+  const N=Math.floor(dur*fs); if(N<16) return null;
+  const x=new Float64Array(N); let j=0;
+  for(let k=0;k<N;k++){ const tk=k/fs; while(j<t.length-2&&t[j+1]<tk)j++; const span=t[j+1]-t[j]; const f=span>0?(tk-t[j])/span:0; x[k]=nn[j]+f*(nn[j+1]-nn[j]); }
+  let mean=0; for(let k=0;k<N;k++) mean+=x[k]; mean/=N;
+  let U=0; for(let k=0;k<N;k++){ const w=0.5-0.5*Math.cos(2*Math.PI*k/(N-1)); x[k]=(x[k]-mean)*w; U+=w*w; } U/=N;
+  let Nf=1; while(Nf<N) Nf<<=1;
+  const re=new Float64Array(Nf), im=new Float64Array(Nf); for(let k=0;k<N;k++) re[k]=x[k]; _fft(re,im);
+  const df=fs/Nf; let vlf=0,lf=0,hf=0;
+  for(let k=1;k<=Nf/2;k++){ const fr=k*df; let p=(re[k]*re[k]+im[k]*im[k])/(fs*N*U)*df; if(k!==Nf/2)p*=2; if(fr>=0.0033&&fr<0.04)vlf+=p; else if(fr>=0.04&&fr<0.15)lf+=p; else if(fr>=0.15&&fr<0.40)hf+=p; }
+  const tpRaw=vlf+lf+hf;
+  // calibrazione su scala emWave (bande e TP hanno fattori distinti, come emWave dove TP≠Σbande)
+  return { vlf:vlf*FREQ_CAL.vlf, lf:lf*FREQ_CAL.lf, hf:hf*FREQ_CAL.hf, tp:tpRaw*FREQ_CAL.tp };
+}
 
 function parseEmwaveCSV(text){
   const rows = text.split(/\r?\n/).map(l=>l.split(','));
@@ -668,6 +693,18 @@ function rebuildFromBeats(){
     if(TONIC_RR.length>=4){ const pc=poincareRR(TONIC_RR);
       document.getElementById('sdnn').value=Math.round(pc.sdnn*10)/10;
       document.getElementById('rmssd').value=Math.round(pc.rmssd*10)/10; }
+    // Dati da fascia (no emWave): calcola le frequenze, calibrate su scala emWave,
+    // e RICALCOLA ad ogni modifica manuale dei battiti.
+    if(!TONIC_HAS_EMWAVE_FREQ){
+      const fr=freqDomainCal(TONIC_RR);
+      if(fr){
+        document.getElementById('tp').value=Math.round(fr.tp);
+        document.getElementById('vlf').value=Math.round(fr.vlf);
+        document.getElementById('lf').value=Math.round(fr.lf);
+        document.getElementById('hf').value=Math.round(fr.hf);
+        if(fr.hf>0) document.getElementById('lfhf').value=Math.round(fr.lf/fr.hf*100)/100;
+      }
+    }
     const nArt=TONIC_BEATS.filter(b=>b.excl).length;
     TONIC_INFO={nRaw:TONIC_BEATS.length, nNN:TONIC_RR.length, nArt, durSec:TONIC_BEATS.reduce((s,b)=>s+b.rr,0)/1000};
   }
@@ -920,6 +957,8 @@ function applyImport(){
   const age=ageFrom(t.dob,t.date); if(age)_set('age',age);
   _set('sdnn',t.sdnn);_set('rmssd',t.rmssd);_set('tp',t.tp);_set('vlf',t.vlf);_set('lf',t.lf);_set('hf',t.hf);
   _set('coh',t.coh);_set('hr',t.mhr); if(t.hf>0)_set('lfhf',t.lf/t.hf);
+  // emWave riporta già le frequenze (TP>0); i file da fascia no → le calcoleremo noi (calibrate)
+  TONIC_HAS_EMWAVE_FREQ = (+t.tp > 0);
   TONIC_BEATS = beatsFromSession(t);
   const fv=document.getElementById('fasicSel').value;
   if(fv!==''){const fs=RAW[+fv]; _set('hrF',fs.mhr);_set('sdnnF',fs.sdnn);_set('rmssdF',fs.rmssd);_set('mhrr',fs.mhrr);_set('cohF',fs.coh); FASIC_BEATS=beatsFromSession(fs);}
@@ -973,7 +1012,8 @@ function calc(){
   document.getElementById('bkBody').innerHTML=rows.map(r=>`<tr><td><b>${r.n}</b></td><td class="val">${r.v}</td><td class="ref">${r.ref}</td><td>${tag(nearestState(r.sev))} <span class="ref">${r.lvl}</span></td><td>${r.bar}</td></tr>`).join('');
   const labels=['VLF','LF','HF'];
   document.getElementById('spectro').innerHTML=sp.disp.map((p,i)=>`<div class="b"><b>${Math.round(p)}%</b><small>${labels[i]} <span style="color:#9fb4bb">(su TP)</span></small></div>`).join('');
-  document.getElementById('spectroNote').innerHTML=`Percentuali sul Total Power (somma ${Math.round(sp.disp.reduce((a,b)=>a+b,0))}%, EnWave filtra parte dello spettro). Forma normalizzata a 100% (${sp.shape.map(x=>Math.round(x)+'%').join('/')}) confrontata col prototipo «${STATES[sp.near].label}». LF/HF ${lfhf} → ${lfhf>=2?'predominanza ortosimpatica':lfhf>=1?'bilanciamento orto/para':'predominanza parasimpatica'}.`;
+  document.getElementById('spectroNote').innerHTML=`Percentuali sul Total Power (somma ${Math.round(sp.disp.reduce((a,b)=>a+b,0))}%, EnWave filtra parte dello spettro). Forma normalizzata a 100% (${sp.shape.map(x=>Math.round(x)+'%').join('/')}) confrontata col prototipo «${STATES[sp.near].label}». LF/HF ${lfhf} → ${lfhf>=2?'predominanza ortosimpatica':lfhf>=1?'bilanciamento orto/para':'predominanza parasimpatica'}.`
+    + (TONIC_HAS_EMWAVE_FREQ ? '' : ` <b>Frequenze calcolate dai battiti della fascia e calibrate sulla scala emWave</b> (LF/HF affidabili ~3%; VLF e Total Power sono una stima, ~5–12%, come inevitabile in 5 minuti).`);
   drawFreqBars(sp.shape, sp.near);
   drawAgeBars('ageSdnn','sdnn',sex,sdnn,band);
   drawAgeBars('ageRmssd','rmssd',sex,rmssd,band);

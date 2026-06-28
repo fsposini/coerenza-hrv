@@ -1,4 +1,4 @@
-const CACHE = 'coerenza-hrv-v6-emwave';
+const CACHE = 'coerenza-hrv-v7-freqcal';
 const ASSETS = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
