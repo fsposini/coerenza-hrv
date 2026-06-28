@@ -582,12 +582,9 @@ function stressGaugeSVG(si){
   s+=`</svg>`;
   return s;
 }
-function renderStressHero(si){
-  const host=document.getElementById('siHero'); if(!host) return;
+function stressHeroInner(si){
   const v=siVerdict(si);
-  host.style.setProperty('--si-col', v.col);
-  host.innerHTML =
-    `<div class="si-gauge">${stressGaugeSVG(si)}</div>`+
+  return `<div class="si-gauge">${stressGaugeSVG(si)}</div>`+
     `<div class="si-verdict">`+
       `<div class="si-chip" style="background:${v.col}">${v.big}</div>`+
       `<div class="si-sub">${v.sub}</div>`+
@@ -595,6 +592,16 @@ function renderStressHero(si){
         `<span class="d" style="background:#f4a82c"></span>Stress elevato`+
         `<span class="d" style="background:#b3201e"></span>Molto elevato</div>`+
     `</div>`;
+}
+// Blocco autonomo (con wrapper colorato) per riuso nel report finale.
+function stressHeroBlock(si){
+  const v=siVerdict(si);
+  return `<div class="si-hero" style="--si-col:${v.col}">${stressHeroInner(si)}</div>`;
+}
+function renderStressHero(si){
+  const host=document.getElementById('siHero'); if(!host) return;
+  host.style.setProperty('--si-col', siVerdict(si).col);
+  host.innerHTML = stressHeroInner(si);
 }
 function ratioRead(r){
   if(r<0.25) return 'SD2 nettamente &gt; SD1: variabilità dominata dalla regolazione lenta; componente vagale rapida modesta in proporzione.';
@@ -1251,7 +1258,8 @@ function calc(){
   let headHtml=`<p class="lead">Quadro tonico: <b style="color:${st.color}">${st.label}</b> (mappa MANO: <b>${st.finger}</b>)`;
   if(hasFasic) headHtml+=`, con risposta fasica <b style="color:${fa.color}">${fa.cls.toLowerCase()}</b> e riserva adattativa stimata al <b>${fa.res}%</b>`;
   headHtml+=`.</p>`;
-  document.getElementById('finalHead').innerHTML=headHtml;
+  // Tachimetro dello Stress Index in cima al report finale (massimo rilievo per il paziente)
+  document.getElementById('finalHead').innerHTML = stressHeroBlock(si.SI) + headHtml;
 
   // prognosi
   let prog;

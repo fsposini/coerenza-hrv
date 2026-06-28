@@ -1,4 +1,4 @@
-const CACHE = 'coerenza-hrv-v9-stressgauge';
+const CACHE = 'coerenza-hrv-v10-stressgauge-final';
 const ASSETS = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
