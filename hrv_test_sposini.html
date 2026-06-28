@@ -788,6 +788,7 @@ function parseEmwaveCSV(text){
       name:(get('First Name',vc)+' '+get('Last Name',vc)).trim(),
       dob:get('Date of Birth',vc), gender:get('Gender',vc),
       date:get('Date Created',vc), type:get('Type',vc),
+      age:+get('Age',vc), pop:get('Population',vc),
       sdnn:+get('SDNN',vc), rmssd:+get('RMSSD',vc), tp:+get('Total Power',vc),
       vlf:+get('Very Low Frequency',vc), lf:+get('Low Frequency',vc), hf:+get('High Frequency',vc),
       coh:+get('Normal Coherence',vc), mhr:+get('Mean Heart Rate',vc), mhrr:+get('Mean Heart Rate Range',vc),
@@ -1101,7 +1102,10 @@ function applyImport(){
   const ti=+document.getElementById('tonicSel').value, t=RAW[ti];
   _set('name',t.name); _set('date',t.date);
   const sexEl=document.getElementById('sex'); if(/F/i.test(t.gender))sexEl.value='female'; else if(/M/i.test(t.gender))sexEl.value='male';
-  const age=ageFrom(t.dob,t.date); if(age)_set('age',age);
+  // Età: dal campo esplicito (file da fascia) o, in mancanza, dalla data di nascita (emWave)
+  const age = (t.age>0) ? t.age : ageFrom(t.dob,t.date); if(age)_set('age',age);
+  // Categoria popolazione dal file (fascia); per i file emWave resta la scelta manuale
+  if(t.pop && /^(comune|atleti|fumatori)$/.test(t.pop)) document.getElementById('pop').value=t.pop;
   _set('sdnn',t.sdnn);_set('rmssd',t.rmssd);_set('tp',t.tp);_set('vlf',t.vlf);_set('lf',t.lf);_set('hf',t.hf);
   _set('coh',t.coh);_set('hr',t.mhr); if(t.hf>0)_set('lfhf',t.lf/t.hf);
   // emWave riporta già le frequenze (TP>0); i file da fascia no → le calcoleremo noi (calibrate)
