@@ -1,6 +1,6 @@
 {
-  "name": "Coerenza HRV — Dr. Sposini",
-  "short_name": "Coerenza HRV",
+  "name": "HRV test dott. Sposini",
+  "short_name": "HRV test Sposini",
   "description": "Test HRV tonico e fasico — classificazione MANO — Dr. Federico Sposini",
   "start_url": "./index.html",
   "display": "standalone",
