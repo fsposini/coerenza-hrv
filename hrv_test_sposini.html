@@ -573,7 +573,7 @@ function stressGaugeSVG(si){
   // tacche ai confini
   [135,90,45].forEach(d=>{ const a=pol(R+sw/2,d), b=pol(R-sw/2,d); s+=`<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="#fff" stroke-width="2"/>`; });
   // lancetta
-  const deg=180-siFrac(si)*180, tip=pol(R-6,deg), tail=pol(-22,deg);
+  const deg=180-siFrac(si)*180, tip=pol(R-6,deg), tail=pol(-12,deg);
   s+=`<line x1="${tail[0].toFixed(1)}" y1="${tail[1].toFixed(1)}" x2="${tip[0].toFixed(1)}" y2="${tip[1].toFixed(1)}" stroke="#1f2d33" stroke-width="5" stroke-linecap="round"/>`;
   s+=`<circle cx="${cx}" cy="${cy}" r="10" fill="#1f2d33"/>`;
   // valore numerico grande
