@@ -75,6 +75,16 @@
   .geomgrid .panel .sub{font-size:11px;color:var(--muted);margin-bottom:8px}
   .geomgrid svg{width:100%;height:auto;display:block;background:#fff;border-radius:6px}
   .siband{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11.5px;font-weight:700;color:#fff}
+  .si-hero{display:flex;align-items:center;gap:22px;flex-wrap:wrap;margin:4px 0 18px;padding:16px 18px;border-radius:14px;
+    background:linear-gradient(135deg,#fbfdfd,#f3f8f9);border:1px solid var(--line);border-left:8px solid var(--si-col,#7a8a90);break-inside:avoid}
+  .si-gauge{flex:0 0 280px;max-width:300px}
+  .si-gauge svg{width:100%;height:auto;display:block}
+  .si-verdict{flex:1 1 220px;min-width:200px}
+  .si-chip{display:inline-block;color:#fff;font-weight:800;font-size:19px;letter-spacing:.2px;padding:7px 16px;border-radius:24px;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+  .si-sub{margin-top:10px;font-size:14px;line-height:1.5;color:#33454c}
+  .si-scale{margin-top:12px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .si-scale .d{width:11px;height:11px;border-radius:50%;display:inline-block;margin-left:8px}
+  .si-scale .d:first-child{margin-left:0}
 
   .commentary p{margin:0 0 11px}
   .commentary .lead{font-size:15px}
@@ -220,6 +230,7 @@
   <!-- POINCARÉ & STRESS INDEX -->
   <div class="card" id="geomCard">
     <h2>Indici geometrici e non lineari — Poincaré & Stress Index</h2>
+    <div class="si-hero" id="siHero"></div>
     <div class="geomgrid">
       <div class="panel">
         <h3>Poincaré Plot</h3>
@@ -312,8 +323,10 @@
       <b>ipotetiche</b>: individuano lo stato e la reattività che meglio correlano col pattern dei dati secondo il
       Modello Integrato HRV. Tonico calibrato su scala VOSS (SDNN/RMSSD) e scala di riferimento per popolazione (Total Power),
       registrazioni 5 min; fasico letto come risposta alla perturbazione respiratoria standardizzata (Harmat).
-      <b>Indici geometrici:</b> SD1/SD2 sono identità matematiche di SDNN/RMSSD (Brennan 2001); lo Stress Index è <b>stimato</b> dai parametri di sintesi
-      (gaussiana, bin 50 ms, MxDMn≈5,5·SDNN) perché l'EnWave non esporta la serie RR — vanno letti come indicazioni di tendenza, non come misure sul tracciato reale.
+      <b>Indici geometrici:</b> SD1/SD2 sono identità matematiche di SDNN/RMSSD (Brennan 2001). Lo <b>Stress Index di Baevsky</b>
+      [SI = AMo/(2·Mo·MxDMn)] è un algoritmo validato e standard (Baevsky 2008; usato anche in software come Kubios):
+      <b>con l'import della serie RR grezza</b> (export emWave o fascia) è calcolato dall'istogramma <b>reale</b> dei battiti → valore esatto;
+      solo in inserimento manuale, senza i battiti, è <b>stimato</b> (gaussiana, bin 50 ms, MxDMn≈5,5·SDNN) e va letto come tendenza.
       Strumento di supporto al ragionamento clinico, non referto diagnostico.
     </div>
   </div>
@@ -529,6 +542,59 @@ function siBand(si){
   if(si<=150)return {lbl:'Equilibrio', col:'#7cb342', txt:'Stress Index nel range fisiologico a riposo (≈80–150 c.u.): buon bilanciamento simpato-vagale, attivazione ortosimpatica contenuta.'};
   if(si<=500)return {lbl:'Attivazione orto', col:'#f4a82c', txt:'Stress Index elevato: attivazione ortosimpatica marcata, coerente con carico interno / fase di stress. Valutare recupero e fattori che mantengono il drive simpatico.'};
   return {lbl:'Iperattivazione orto', col:'#b3201e', txt:'Stress Index molto alto: forte predominanza ortosimpatica, sistema rigido e centralizzato. Recupero compromesso — bersaglio prioritario di intervento.'};
+}
+// Verdetto in linguaggio paziente per il visual d'impatto (semaforo/tachimetro).
+function siVerdict(si){
+  if(isNaN(si)) return {big:'n/d', col:'#7a8a90', sub:'Dato non disponibile.'};
+  if(si<50)   return {big:'Molto rilassato', col:'#1b8a5a', sub:'Sistema nervoso in forte risparmio energetico. Da leggere insieme agli altri indici.'};
+  if(si<=150) return {big:'Equilibrio', col:'#1b8a5a', sub:'Il sistema nervoso gestisce bene lo stress fisiologico: bilanciamento sano.'};
+  if(si<=500) return {big:'Stress elevato', col:'#e8820c', sub:'Carico di stress importante sul sistema nervoso: è il momento di lavorare sul recupero.'};
+  return {big:'Stress molto elevato', col:'#b3201e', sub:'Il sistema nervoso è sotto forte pressione: rendere il recupero una priorità.'};
+}
+// Posizione della lancetta sull'arco: 4 zone visive uguali (Para/Equilibrio/Attivazione/Iper)
+// con interpolazione interna; 0=tutto a sinistra, 1=tutto a destra. Cap a SI 1000.
+function siFrac(si){
+  if(isNaN(si)) return 0;
+  if(si<=50)  return (si/50)*0.25;
+  if(si<=150) return 0.25+(si-50)/100*0.25;
+  if(si<=500) return 0.50+(si-150)/350*0.25;
+  return 0.75+Math.min(1,(si-500)/500)*0.25;
+}
+// Tachimetro semicircolare SVG, zone colorate + lancetta. Robusto: archi campionati a punti.
+function stressGaugeSVG(si){
+  const cx=180, cy=176, R=140, sw=30;
+  const pol=(r,deg)=>{const a=deg*Math.PI/180; return [cx+r*Math.cos(a), cy-r*Math.sin(a)];};
+  const arc=(d0,d1)=>{ const n=Math.max(2,Math.ceil(Math.abs(d0-d1)/4)), p=[];
+    for(let i=0;i<=n;i++){ const d=d0+(d1-d0)*i/n; const xy=pol(R,d); p.push(xy[0].toFixed(1)+','+xy[1].toFixed(1)); }
+    return p.join(' '); };
+  const zones=[[180,135,'#1b8a5a'],[135,90,'#7cb342'],[90,45,'#f4a82c'],[45,0,'#b3201e']];
+  let s=`<svg viewBox="0 0 360 210" role="img" aria-label="Stress Index">`;
+  zones.forEach(z=>{ s+=`<polyline points="${arc(z[0],z[1])}" fill="none" stroke="${z[2]}" stroke-width="${sw}" stroke-linecap="butt"/>`; });
+  // tacche ai confini
+  [135,90,45].forEach(d=>{ const a=pol(R+sw/2,d), b=pol(R-sw/2,d); s+=`<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="#fff" stroke-width="2"/>`; });
+  // lancetta
+  const deg=180-siFrac(si)*180, tip=pol(R-6,deg), tail=pol(-22,deg);
+  s+=`<line x1="${tail[0].toFixed(1)}" y1="${tail[1].toFixed(1)}" x2="${tip[0].toFixed(1)}" y2="${tip[1].toFixed(1)}" stroke="#1f2d33" stroke-width="5" stroke-linecap="round"/>`;
+  s+=`<circle cx="${cx}" cy="${cy}" r="10" fill="#1f2d33"/>`;
+  // valore numerico grande
+  s+=`<text x="${cx}" y="${cy-34}" text-anchor="middle" font-size="46" font-weight="800" fill="#1f2d33">${isNaN(si)?'—':Math.round(si)}</text>`;
+  s+=`<text x="${cx}" y="${cy-14}" text-anchor="middle" font-size="14" fill="#7a8a90">Stress Index (c.u.)</text>`;
+  s+=`</svg>`;
+  return s;
+}
+function renderStressHero(si){
+  const host=document.getElementById('siHero'); if(!host) return;
+  const v=siVerdict(si);
+  host.style.setProperty('--si-col', v.col);
+  host.innerHTML =
+    `<div class="si-gauge">${stressGaugeSVG(si)}</div>`+
+    `<div class="si-verdict">`+
+      `<div class="si-chip" style="background:${v.col}">${v.big}</div>`+
+      `<div class="si-sub">${v.sub}</div>`+
+      `<div class="si-scale"><span class="d" style="background:#1b8a5a"></span>Equilibrio`+
+        `<span class="d" style="background:#f4a82c"></span>Stress elevato`+
+        `<span class="d" style="background:#b3201e"></span>Molto elevato</div>`+
+    `</div>`;
 }
 function ratioRead(r){
   if(r<0.25) return 'SD2 nettamente &gt; SD1: variabilità dominata dalla regolazione lenta; componente vagale rapida modesta in proporzione.';
@@ -1132,6 +1198,7 @@ function calc(){
   }
   const sevSD1=sevFromVoss(pc.sd1, sd1Ref), sevSD2=sevFromVoss(pc.sd2, sd2Ref);
   const sib=siBand(si.SI);
+  renderStressHero(si.SI);
   const grows=[
     {n:'SD1', v:pc.sd1.toFixed(1)+' ms', ref:`${sd1Ref[0].toFixed(0)} – <b>${sd1Ref[1].toFixed(0)}</b> – ${sd1Ref[2].toFixed(0)} ms <span class="ref">· VOSS RMSSD/√2</span>`, tg:tag(nearestState(sevSD1)), lvl:levelLabel(sevSD1), bar:barVoss(pc.sd1,sd1Ref), read:'Variabilità vagale rapida, beat-to-beat (≡ RMSSD/√2).'},
     {n:'SD2', v:pc.sd2.toFixed(1)+' ms', ref:`${sd2Ref[0].toFixed(0)} – <b>${sd2Ref[1].toFixed(0)}</b> – ${sd2Ref[2].toFixed(0)} ms <span class="ref">· da VOSS</span>`, tg:tag(nearestState(sevSD2)), lvl:levelLabel(sevSD2), bar:barVoss(pc.sd2,sd2Ref), read:'Variabilità lenta non vagale (orto + regolazione lenta).'},
