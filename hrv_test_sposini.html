@@ -115,6 +115,7 @@
   .progn{background:#eef4f6;border-left:4px solid var(--teal);padding:12px 16px;border-radius:6px;margin:6px 0 16px;font-size:14px}
 
   @media(max-width:880px){.grid{grid-template-columns:1fr}.strategy{grid-template-columns:1fr}}
+  @page{ margin:12mm 12mm 14mm; }
   @media print{
     body{background:#fff;font-size:12.5px}
     .noprint{display:none!important}
@@ -328,6 +329,15 @@
       <b>con l'import della serie RR grezza</b> (export emWave o fascia) è calcolato dall'istogramma <b>reale</b> dei battiti → valore esatto;
       solo in inserimento manuale, senza i battiti, è <b>stimato</b> (gaussiana, bin 50 ms, MxDMn≈5,5·SDNN) e va letto come tendenza.
       Strumento di supporto al ragionamento clinico, non referto diagnostico.
+    </div>
+  </div>
+
+  <div class="card noprint" id="printCard" style="text-align:center">
+    <button class="btn" onclick="window.print()">🖨️ Stampa / Salva come PDF</button>
+    <div class="hint" style="margin-top:10px;text-align:left">
+      Per inviare il referto al paziente: premi il pulsante, poi nel dialogo di stampa imposta <b>Destinazione → «Salva come PDF»</b>.
+      Per un PDF pulito, apri <b>«Altre impostazioni»</b> e <b>disattiva «Intestazioni e piè di pagina»</b> (così non compaiono data, indirizzo del file e numeri di pagina).
+      Salva il file e allegalo alla mail. I campi di inserimento dati e gli strumenti di pulizia <b>non vengono stampati</b>: nel PDF resta solo il referto.
     </div>
   </div>
 
