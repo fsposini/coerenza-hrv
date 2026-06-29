@@ -1,4 +1,4 @@
-const CACHE = 'coerenza-hrv-v12-respiro-coerenza';
+const CACHE = 'coerenza-hrv-v13-si-riferimento';
 const ASSETS = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

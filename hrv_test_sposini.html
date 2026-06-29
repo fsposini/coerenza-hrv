@@ -543,6 +543,9 @@ function siBand(si){
   if(si<=500)return {lbl:'Attivazione orto', col:'#f4a82c', txt:'Stress Index elevato: attivazione ortosimpatica marcata, coerente con carico interno / fase di stress. Valutare recupero e fattori che mantengono il drive simpatico.'};
   return {lbl:'Iperattivazione orto', col:'#b3201e', txt:'Stress Index molto alto: forte predominanza ortosimpatica, sistema rigido e centralizzato. Recupero compromesso — bersaglio prioritario di intervento.'};
 }
+// Tetto della zona di equilibrio: riferimento mostrato accanto al valore (es. "88 / 150")
+// così il paziente coglie subito quanto è alto il suo Stress Index. Mostrato OVUNQUE.
+const SI_REF = 150;
 // Verdetto in linguaggio paziente per il visual d'impatto (semaforo/tachimetro).
 function siVerdict(si){
   if(isNaN(si)) return {big:'n/d', col:'#7a8a90', sub:'Dato non disponibile.'};
@@ -572,13 +575,19 @@ function stressGaugeSVG(si){
   zones.forEach(z=>{ s+=`<polyline points="${arc(z[0],z[1])}" fill="none" stroke="${z[2]}" stroke-width="${sw}" stroke-linecap="butt"/>`; });
   // tacche ai confini
   [135,90,45].forEach(d=>{ const a=pol(R+sw/2,d), b=pol(R-sw/2,d); s+=`<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="#fff" stroke-width="2"/>`; });
+  // numeri della scala ai confini delle zone (50 · 150 · 500), appena dentro l'arco
+  [[135,'50'],[90,'150'],[45,'500']].forEach(z=>{ const p=pol(R-sw/2-11,z[0]); s+=`<text x="${p[0].toFixed(1)}" y="${p[1].toFixed(1)}" font-size="11.5" font-weight="700" fill="#5a6b72" text-anchor="middle" dominant-baseline="middle">${z[1]}</text>`; });
   // lancetta
   const deg=180-siFrac(si)*180, tip=pol(R-6,deg), tail=pol(-12,deg);
   s+=`<line x1="${tail[0].toFixed(1)}" y1="${tail[1].toFixed(1)}" x2="${tip[0].toFixed(1)}" y2="${tip[1].toFixed(1)}" stroke="#1f2d33" stroke-width="5" stroke-linecap="round"/>`;
   s+=`<circle cx="${cx}" cy="${cy}" r="10" fill="#1f2d33"/>`;
-  // valore numerico grande
-  s+=`<text x="${cx}" y="${cy-34}" text-anchor="middle" font-size="46" font-weight="800" fill="#1f2d33">${isNaN(si)?'—':Math.round(si)}</text>`;
-  s+=`<text x="${cx}" y="${cy-14}" text-anchor="middle" font-size="14" fill="#7a8a90">Stress Index (c.u.)</text>`;
+  // valore + riferimento (es. "88 / 150"): il paziente coglie subito la collocazione
+  if(isNaN(si)){
+    s+=`<text x="${cx}" y="${cy-34}" text-anchor="middle" font-size="44" font-weight="800" fill="#1f2d33">—</text>`;
+  } else {
+    s+=`<text x="${cx}" y="${cy-34}" text-anchor="middle" font-weight="800" fill="#1f2d33"><tspan font-size="44">${Math.round(si)}</tspan><tspan font-size="22" font-weight="600" fill="#7a8a90"> / ${SI_REF}</tspan></text>`;
+  }
+  s+=`<text x="${cx}" y="${cy-14}" text-anchor="middle" font-size="13.5" fill="#7a8a90">Stress Index · rif. ≤${SI_REF}</text>`;
   s+=`</svg>`;
   return s;
 }
@@ -946,7 +955,7 @@ function drawSIHistReal(sx_, si){
   s+=`<line x1="${cmo.toFixed(1)}" y1="${pad+24}" x2="${cmo.toFixed(1)}" y2="${base}" stroke="#2c6475" stroke-dasharray="3 3"/>`;
   s+=`<text x="${(cmo+4).toFixed(1)}" y="${base-6}" font-size="10" fill="#2c6475">Mo ${Math.round(moMs)} ms · AMo ${si.AMo.toFixed(0)}%</text>`;
   s+=`<text x="${pad}" y="${H-10}" font-size="11" fill="#65787f">RR (ms)</text>`;
-  s+=`<text x="${W-pad}" y="${H-10}" font-size="13" fill="#1f2d33" text-anchor="end" font-weight="700">SI ${si.SI.toFixed(0)}</text>`;
+  s+=`<text x="${W-pad}" y="${H-10}" font-size="13" fill="#1f2d33" text-anchor="end" font-weight="700">SI ${si.SI.toFixed(0)} / ${SI_REF}</text>`;
   el.innerHTML=s;
 }
 
@@ -1215,7 +1224,7 @@ function calc(){
     {n:'SD2', v:pc.sd2.toFixed(1)+' ms', ref:`${sd2Ref[0].toFixed(0)} – <b>${sd2Ref[1].toFixed(0)}</b> – ${sd2Ref[2].toFixed(0)} ms <span class="ref">· da VOSS</span>`, tg:tag(nearestState(sevSD2)), lvl:levelLabel(sevSD2), bar:barVoss(pc.sd2,sd2Ref), read:'Variabilità lenta non vagale (orto + regolazione lenta).'},
     {n:'SD1/SD2', v:pc.ratio.toFixed(2), ref:'~0,30–0,50 a riposo', tg:'', lvl:'', bar:'', read:ratioRead(pc.ratio)},
     {n:'Area ellisse', v:Math.round(pc.area).toLocaleString('it-IT')+' ms²', ref:'∝ SDNN · Total Power', tg:'', lvl:'', bar:'', read:'Variabilità globale (correla con SDNN e Total Power).'},
-    {n:'Stress Index', v:si.SI.toFixed(0)+' c.u.', ref:'≈80–150 equilibrio <span class="ref">· Baevsky</span>', tg:`<span class="siband" style="background:${sib.col}">${sib.lbl}</span>`, lvl:'', bar:'', read:sib.txt},
+    {n:'Stress Index', v:si.SI.toFixed(0)+' / '+SI_REF+' c.u.', ref:'≈80–150 equilibrio <span class="ref">· Baevsky · rif. ≤'+SI_REF+'</span>', tg:`<span class="siband" style="background:${sib.col}">${sib.lbl}</span>`, lvl:'', bar:'', read:sib.txt},
   ];
   if(exact && !isNaN(alpha1)) grows.push(
     {n:'DFA α1', v:alpha1.toFixed(2), ref:'~1,0 ottimale <span class="ref">· Peng</span>', tg:'', lvl:'', bar:'', read:alpha1Read(alpha1)});
@@ -1286,7 +1295,7 @@ function calc(){
   let ig=`<p class="lead"><b>Lettura d'insieme.</b> Quadro tonico <b style="color:${st.color}">${st.label}</b> (mappa MANO: ${st.finger}). `+
     `SDNN ${lv(sSdnn)} e RMSSD ${lv(sRmssd)} rispetto al riferimento VOSS per età e sesso; Total Power ${lv(sTP)}, come indice di complessità ed efficienza del sistema. `+
     `La distribuzione spettrale richiama il prototipo «${STATES[sp.near].label}» e la coerenza è ${cohLabel(coh)}. `+
-    `Stress Index ${isNaN(si.SI)?'n/d':Math.round(si.SI)} (${sib.lbl}), rapporto SD1/SD2 ${pc.ratio.toFixed(2)}`+
+    `Stress Index ${isNaN(si.SI)?'n/d':Math.round(si.SI)+' / '+SI_REF} (${sib.lbl}), rapporto SD1/SD2 ${pc.ratio.toFixed(2)}`+
     (exact&&!isNaN(alpha1)?`, DFA α1 ${alpha1.toFixed(2)}`:'')+`.`;
   if(hasFasic) ig+=` Sotto respiro guidato (6/min) la risposta è <b style="color:${fa.color}">${fa.cls.toLowerCase()}</b>, con riserva adattativa stimata al ${fa.res}%.`;
   ig+=` <b>Direzione di lavoro prioritaria:</b> ${coherenceWeak?'ricostruire la coerenza/risonanza con il respiro prima di chiedere performance al sistema':'mantenimento attivo con stimoli ormetici calibrati'}`+
