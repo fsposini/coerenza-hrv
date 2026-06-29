@@ -1,4 +1,4 @@
-const CACHE = 'coerenza-hrv-v14-pdf';
+const CACHE = 'coerenza-hrv-v15-pdf-impaginazione';
 const ASSETS = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

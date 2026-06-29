@@ -119,10 +119,11 @@
   @media print{
     body{background:#fff;font-size:12.5px}
     .noprint{display:none!important}
-    .card{box-shadow:none;border-color:#ccc}
-    .card:not(.commentary){break-inside:avoid;page-break-inside:avoid}
-    table.bk tr,.flag,.progn,#interpGlobale,#finalHead,.strategy .dom,.geomgrid .panel,.spectro .b,.findings li,.reactive-head,svg{break-inside:avoid;page-break-inside:avoid}
-    h2{break-after:avoid;page-break-after:avoid}
+    /* le card POSSONO spezzarsi tra le pagine → riempiono lo spazio, niente vuoti */
+    .card{box-shadow:none;border-color:#ccc;break-inside:auto;page-break-inside:auto;margin-bottom:10px}
+    /* restano interi solo gli elementi atomici: figure, righe di tabella, riquadri */
+    svg,table.bk tr,.si-hero,.flag,.progn,#interpGlobale,.strategy .dom,.geomgrid .panel,.spectro .b,.findings li,.reactive-head{break-inside:avoid;page-break-inside:avoid}
+    h2,h3{break-after:avoid;page-break-after:avoid}
     .wrap{padding:0}
     header.top .brand img.logo{height:50px}
   }
